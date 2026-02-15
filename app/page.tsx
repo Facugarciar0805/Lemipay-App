@@ -2,82 +2,20 @@
 
 import { useWallet } from "@/context/wallet-context"
 import { useLemipay } from "@/hooks/use-lemipay"
-import { Navbar } from "@/components/lemipay/navbar"
-import { GroupCard } from "@/components/lemipay/group-card"
-import { FundRoundProgress } from "@/components/lemipay/fund-round-progress"
-import { ProposalList } from "@/components/lemipay/proposal-item"
-import { MembersPanel } from "@/components/lemipay/members-panel"
-import { StatCards } from "@/components/lemipay/stat-cards"
-import { Button } from "@/components/ui/button"
-import Image from "next/image"
-import { ArrowRight, Shield, Users, Zap } from "lucide-react"
 
-function ConnectPrompt() {
-  const { connect, isConnecting } = useWallet()
+// Componentes de Lógica (v0)
+import { GroupCard } from "@/components/lemipay/v0/group-card"
+import { FundRoundProgress } from "@/components/lemipay/v0/fund-round-progress"
+import { ProposalList } from "@/components/lemipay/v0/proposal-item"
+import { MembersPanel } from "@/components/lemipay/v0/members-panel"
+import { StatCards } from "@/components/lemipay/v0/stat-cards"
 
-  return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4">
-      <div className="mx-auto max-w-md text-center">
-        <div className="mb-8 flex justify-center">
-          <div className="relative">
-            <div className="absolute -inset-4 rounded-full bg-primary/10 blur-xl" />
-            <Image
-              src="/images/lemipay-logo.jpeg"
-              alt="Lemipay logo"
-              width={80}
-              height={80}
-              className="relative rounded-2xl"
-            />
-          </div>
-        </div>
-        <h1 className="mb-3 text-3xl font-bold tracking-tight text-foreground text-balance">
-          Gestion de tesoreria grupal
-        </h1>
-        <p className="mb-8 text-muted-foreground leading-relaxed text-balance">
-          Administra fondos compartidos con total transparencia.
-          Rondas de fondeo, propuestas de pago y firmas multiples.
-        </p>
-
-        <Button
-          size="lg"
-          onClick={connect}
-          disabled={isConnecting}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 px-8"
-        >
-          {isConnecting ? "Conectando..." : "Conectar Wallet"}
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-
-        <div className="mt-12 grid grid-cols-3 gap-6">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-xs text-muted-foreground text-center">
-              Fondos grupales
-            </span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-              <Shield className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-xs text-muted-foreground text-center">
-              Multi-firma
-            </span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-              <Zap className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-xs text-muted-foreground text-center">
-              Transparente
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+// Componentes de Estética (Lovable) - Asegúrate de que las rutas coincidan
+import Navbar from "@/components/landing/NavBar"
+import HeroSection from "@/components/landing/HeroSection"
+import HowItWorks from "@/components/landing/HowItWorks"
+import DashboardPreview from "@/components/landing/DashboardPreview"
+import Footer from "@/components/landing/Footer"
 
 function Dashboard() {
   const { address } = useWallet()
@@ -94,54 +32,74 @@ function Dashboard() {
   } = useLemipay(address)
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6">
-      <div className="flex flex-col gap-6">
-        {/* Top: Balance + Stats */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <GroupCard
-            group={group}
-            totalBalance={totalBalance}
-            isLoading={isLoading}
-          />
-          <div className="flex flex-col gap-4">
-            <StatCards
-              fundRounds={fundRounds}
-              proposals={proposals}
-              isLoading={isLoading}
+      <main className="mx-auto max-w-5xl px-4 py-6">
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <GroupCard group={group} totalBalance={totalBalance} isLoading={isLoading} />
+            <div className="flex flex-col gap-4">
+              <StatCards fundRounds={fundRounds} proposals={proposals} isLoading={isLoading} />
+              <MembersPanel group={group} isLoading={isLoading} />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FundRoundProgress
+                rounds={fundRounds}
+                isLoading={isLoading}
+                onContribute={contribute}
+                isSubmitting={isSubmitting}
             />
-            <MembersPanel group={group} isLoading={isLoading} />
+            <ProposalList
+                proposals={proposals}
+                group={group}
+                isLoading={isLoading}
+                onApprove={approveProposal}
+                onExecute={executeRelease}
+                isSubmitting={isSubmitting}
+            />
           </div>
         </div>
+      </main>
+  )
+}
 
-        {/* Bottom: Rounds + Proposals */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <FundRoundProgress
-            rounds={fundRounds}
-            isLoading={isLoading}
-            onContribute={contribute}
-            isSubmitting={isSubmitting}
+function LandingPage() {
+  const { connect, isConnected, isConnecting } = useWallet()
+
+  return (
+      <div className="min-h-screen bg-background">
+        {/* Pasamos las funciones reales de la wallet a los componentes de Lovable */}
+        <Navbar
+            walletConnected={isConnected}
+            onConnectWallet={connect}
+        />
+        <main>
+          <HeroSection
+              walletConnected={isConnected}
+              onConnectWallet={connect}
           />
-          <ProposalList
-            proposals={proposals}
-            group={group}
-            isLoading={isLoading}
-            onApprove={approveProposal}
-            onExecute={executeRelease}
-            isSubmitting={isSubmitting}
-          />
-        </div>
+          <HowItWorks />
+          <DashboardPreview walletConnected={isConnected} />
+        </main>
+        <Footer />
       </div>
-    </main>
   )
 }
 
 export default function Page() {
   const { isConnected } = useWallet()
 
+  // Si está conectado, mostramos el Dashboard funcional.
+  // Si no, mostramos la Landing espectacular de Lovable.
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      {isConnected ? <Dashboard /> : <ConnectPrompt />}
-    </div>
+      <div className="min-h-screen bg-background">
+        {isConnected ? (
+            <>
+              <Navbar walletConnected={true} onConnectWallet={() => {}} />
+              <Dashboard />
+            </>
+        ) : (
+            <LandingPage />
+        )}
+      </div>
   )
 }
