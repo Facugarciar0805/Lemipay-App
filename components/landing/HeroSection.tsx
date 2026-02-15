@@ -1,16 +1,16 @@
-import { Wallet, ArrowDown, Loader2 } from "lucide-react"; // Agregamos Loader2
+import { Wallet, ArrowDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HeroSectionProps {
     walletConnected: boolean;
     onConnectWallet: () => void;
-    isConnecting?: boolean; // Prop opcional para el estado de carga
+    isConnecting?: boolean;
 }
 
 const HeroSection = ({ walletConnected, onConnectWallet, isConnecting }: HeroSectionProps) => {
     return (
         <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 pt-16">
-            {/* Decorative circles - Mantener igual */}
+            {/* Decorative circles */}
             <div className="pointer-events-none absolute inset-0">
                 <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/10 animate-float" />
                 <div className="absolute left-1/2 top-1/2 h-[450px] w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-secondary/10" style={{ animationDelay: "1s" }} />
@@ -37,7 +37,7 @@ const HeroSection = ({ walletConnected, onConnectWallet, isConnecting }: HeroSec
                     <Button
                         size="lg"
                         onClick={onConnectWallet}
-                        disabled={isConnecting || walletConnected} // Desactivar si está cargando o ya conectado
+                        disabled={isConnecting || walletConnected}
                         className="gap-2.5 rounded-2xl bg-primary px-8 py-6 font-display text-base font-bold text-primary-foreground animate-pulse-glow hover:brightness-110 transition-all"
                     >
                         {isConnecting ? (
@@ -47,8 +47,8 @@ const HeroSection = ({ walletConnected, onConnectWallet, isConnecting }: HeroSec
                         )}
 
                         {isConnecting
-                            ? "Conectando..."
-                            : walletConnected ? "Wallet Conectada ✓" : "Conectar Wallet"}
+                            ? "Connecting..."
+                            : walletConnected ? "Wallet Connected ✓" : "Connect Wallet"}
                     </Button>
                     <a
                         href="#como-funciona"
@@ -63,7 +63,7 @@ const HeroSection = ({ walletConnected, onConnectWallet, isConnecting }: HeroSec
                     <div className="mt-8 animate-fade-up">
                         <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
                             <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                            Wallet conectada — ¡Explora el dashboard!
+                            Wallet connected - ready to enter dashboard.
                         </div>
                     </div>
                 )}

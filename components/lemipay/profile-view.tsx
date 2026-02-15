@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Users, Plus, Wallet, ChevronRight, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { CreateGroupModal } from "@/components/modal/CreateGroupModal"
 
 const mockGroups = [
     { id: "1", name: "Proyecto Alpha DAO", members: 5, balance: "12,450 XLM", pending: 2, color: "primary" },
@@ -68,6 +69,11 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
                     ))}
                 </div>
             </div>
+
+            <CreateGroupModal
+                open={showCreateGroup}
+                onOpenChange={setShowCreateGroup}
+            />
         </main>
     )
 }

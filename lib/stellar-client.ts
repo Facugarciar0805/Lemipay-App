@@ -1,3 +1,5 @@
+import { rpc } from "@stellar/stellar-sdk"
+
 // Stellar / Soroban client configuration
 // Uses Stellar Testnet with Soroban smart contracts
 
@@ -10,6 +12,24 @@ export const STELLAR_CONFIG = {
     treasury: "CCCRRA4DSWP6UAJTF5XNK7VLD3TASQA3D274WBN5F3RDXLNI4DHJM7IZ",
   },
 } as const
+
+/** Contract ID for create_group. Override with NEXT_PUBLIC_CREATE_GROUP_CONTRACT_ID. */
+export const CREATE_GROUP_CONTRACT_ID =
+  process.env.NEXT_PUBLIC_CREATE_GROUP_CONTRACT_ID ?? STELLAR_CONFIG.contracts.groups
+
+let sorobanServerInstance: rpc.Server | null = null
+
+/** Returns a Soroban RPC Server instance (singleton). */
+export function getSorobanServer(options?: rpc.Server.Options): rpc.Server {
+  if (!sorobanServerInstance) {
+    sorobanServerInstance = new rpc.Server(STELLAR_CONFIG.sorobanUrl, {
+      allowHttp: false,
+      timeout: 30_000,
+      ...options,
+    })
+  }
+  return sorobanServerInstance
+}
 
 // ─── Utility: Stroops <-> XLM ───────────────────────────────────
 // 1 XLM = 10_000_000 stroops (7 decimals)
