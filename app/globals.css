@@ -6,122 +6,81 @@
 
 @layer base {
   :root {
-    /* Fondo Oscuro Profundo de Lemipay */
+    /* Fondo y Texto General */
     --background: 240 20% 4%;
     --foreground: 0 0% 95%;
 
+    /* Cards y Popovers (Neutrales para el Dashboard) */
     --card: 240 15% 8%;
     --card-foreground: 0 0% 95%;
-
     --popover: 240 15% 8%;
     --popover-foreground: 0 0% 95%;
 
-    /* Verde Lima del Logo */
+    /* Acción Principal: Verde Lima */
     --primary: 84 81% 44%;
     --primary-foreground: 240 20% 4%;
 
-    /* Púrpura del Logo */
-    --secondary: 271 81% 56%;
-    --secondary-foreground: 0 0% 100%;
+    /* Acción Secundaria: Neutral (Para evitar el violeta en fondos de v0) */
+    --secondary: 240 10% 12%;
+    --secondary-foreground: 0 0% 95%;
 
     --muted: 240 10% 14%;
     --muted-foreground: 240 5% 55%;
 
-    --accent: 271 81% 56%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 240 10% 18%;
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 260 20% 18%;
-    --input: 260 20% 18%;
+    --border: 240 10% 16%;
+    --input: 240 10% 16%;
     --ring: 84 81% 44%;
 
     --radius: 0.75rem;
 
-    /* Variables extra para componentes de Lovable */
-    --lime: 84 81% 44%;
-    --purple: 271 81% 56%;
+    /* --- VARIABLES DE MARCA LEMIPAY (Solo para Landing) --- */
+    --brand-lime: 84 81% 44%;
+    --brand-purple: 271 81% 56%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
+  * { @apply border-border; }
   body {
-    /* Usamos Inter para el cuerpo y Space Grotesk para títulos */
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', sans-serif;
   }
-
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
-    @apply tracking-tight;
   }
 }
 
 @layer components {
-  /* Cards con efecto cristal de Lovable */
+  /* Efecto Cristal con el violeta de marca */
   .glass-card {
     @apply bg-card/40 backdrop-blur-xl border border-border/50 rounded-2xl;
-    box-shadow: 0 0 30px -10px hsl(var(--purple) / 0.15);
+    box-shadow: 0 0 40px -10px hsla(271, 81%, 56%, 0.15);
   }
 
-  .glow-lime {
-    box-shadow: 0 0 20px hsl(var(--lime) / 0.4), 0 0 60% hsl(var(--lime) / 0.15);
-  }
-
-  /* El texto con degradado que no te aparecía */
   .gradient-text {
     /* Si quieres que el título sea verde lima brillante */
     @apply text-primary;
     /* O si prefieres que sea blanco y solo resalten los iconos */
     /* @apply text-foreground; */
   }
+
+  /* El fondo violeta que querías para items específicos de la landing */
+  .bg-brand-purple {
+    background-color: hsl(var(--brand-purple));
+  }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Animaciones de entrada de la Landing */
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  .animate-fade-up {
-    animation: fade-up 0.6s ease-out both;
-  }
-
-  .animate-fade-up-delay-1 {
-    animation: fade-up 0.6s ease-out 0.15s both;
-  }
-
-  .animate-fade-up-delay-2 {
-    animation: fade-up 0.6s ease-out 0.3s both;
-  }
-
-  .animate-fade-up-delay-3 {
-    animation: fade-up 0.6s ease-out 0.45s both;
-  }
-}
-
-/* Keyframes necesarios para que las cosas se muevan */
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px hsl(var(--lime) / 0.4), 0 0 60px hsl(var(--lime) / 0.1); }
-  50% { box-shadow: 0 0 30px hsl(var(--lime) / 0.6), 0 0 80px hsl(var(--lime) / 0.2); }
+  .animate-fade-up { animation: fade-up 0.6s ease-out both; }
+  .animate-fade-up-delay-1 { animation: fade-up 0.6s ease-out 0.15s both; }
+  .animate-fade-up-delay-2 { animation: fade-up 0.6s ease-out 0.3s both; }
+  .animate-fade-up-delay-3 { animation: fade-up 0.6s ease-out 0.45s both; }
 }
 
 @keyframes fade-up {
