@@ -40,7 +40,7 @@ const DashboardPreview = ({ walletConnected }: DashboardPreviewProps) => {
         <section id="dashboard" className="relative py-24 px-4 md:px-6">
             <div ref={ref} className="container mx-auto max-w-5xl">
                 <div className={`text-center mb-16 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-                    <span className="mb-3 inline-block text-sm font-medium text-secondary">Vista previa</span>
+                    <span className="mb-3 inline-block text-sm font-medium text-brand-purple">Vista previa</span>
                     <h2 className="font-display text-3xl font-bold sm:text-4xl md:text-5xl">
                         Tu <span className="gradient-text">Dashboard</span>
                     </h2>
@@ -53,12 +53,12 @@ const DashboardPreview = ({ walletConnected }: DashboardPreviewProps) => {
                             <div>
                                 <p className="text-xs text-muted-foreground">Grupo activo</p>
                                 <h3 className="font-display text-lg font-semibold text-foreground">
-                                    {walletConnected ? "Proyecto Alpha DAO" : "Conecta tu wallet"}
+                                    {!walletConnected ? "Proyecto Alpha DAO" : "Conecta tu wallet"}
                                 </h3>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className={`h-2 w-2 rounded-full ${walletConnected ? "bg-primary animate-pulse" : "bg-muted-foreground"}`} />
-                                <span className="text-xs text-muted-foreground">{walletConnected ? "En línea" : "Desconectado"}</span>
+                                <span className={`h-2 w-2 rounded-full ${!walletConnected ? "bg-primary animate-pulse" : "bg-muted-foreground"}`} />
+                                <span className="text-xs text-muted-foreground">{!walletConnected ? "En línea" : "Desconectado"}</span>
                             </div>
                         </div>
 
@@ -67,7 +67,7 @@ const DashboardPreview = ({ walletConnected }: DashboardPreviewProps) => {
                             <div className="glass-card rounded-xl p-6 glow-lime">
                                 <p className="text-xs font-medium text-muted-foreground">Balance del Treasury</p>
                                 <p className="mt-2 font-display text-3xl font-bold text-primary">
-                                    {walletConnected ? "12,450" : "—"}
+                                    {!walletConnected ? "12,450" : "—"}
                                     <span className="ml-1 text-base font-normal text-muted-foreground">USDC</span>
                                 </p>
                                 <div className="mt-4 flex items-center gap-1 text-xs text-primary">
@@ -80,10 +80,10 @@ const DashboardPreview = ({ walletConnected }: DashboardPreviewProps) => {
                             <div className="glass-card rounded-xl p-6">
                                 <p className="text-xs font-medium text-muted-foreground">Miembros</p>
                                 <p className="mt-2 font-display text-3xl font-bold text-foreground">
-                                    {walletConnected ? "5" : "—"}
+                                    {!walletConnected ? "5" : "—"}
                                 </p>
                                 <div className="mt-4 flex -space-x-2">
-                                    {walletConnected && [..."MCARD"].map((letter, i) => (
+                                    {!walletConnected && [..."MCARD"].map((letter, i) => (
                                         <div
                                             key={i}
                                             className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground"
@@ -97,8 +97,8 @@ const DashboardPreview = ({ walletConnected }: DashboardPreviewProps) => {
                             {/* Pending */}
                             <div className="glass-card rounded-xl p-6">
                                 <p className="text-xs font-medium text-muted-foreground">Propuestas Pendientes</p>
-                                <p className="mt-2 font-display text-3xl font-bold text-secondary">
-                                    {walletConnected ? "2" : "—"}
+                                <p className="mt-2 font-display text-3xl font-bold text-brand-purple">
+                                    {!walletConnected ? "2" : "—"}
                                 </p>
                                 <p className="mt-4 text-xs text-muted-foreground">Esperando tu voto</p>
                             </div>
@@ -130,7 +130,7 @@ const DashboardPreview = ({ walletConnected }: DashboardPreviewProps) => {
                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" /> Pendiente
                         </span>
-                                                {walletConnected && (
+                                                {!walletConnected && (
                                                     <Button
                                                         size="sm"
                                                         className="rounded-lg bg-secondary px-4 text-xs font-semibold text-secondary-foreground hover:brightness-110"

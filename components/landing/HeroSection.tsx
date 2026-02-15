@@ -30,7 +30,7 @@ const HeroSection = ({ walletConnected, onConnectWallet, isConnecting }: HeroSec
                 </h1>
 
                 <p className="animate-fade-up-delay-2 mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg md:text-xl">
-                    Crea grupos, fondea tesorerías y aprueba gastos en la red Stellar sin complicaciones técnicas
+                    Crea grupos, fondea tesorerías y aprobá gastos en la red Stellar sin complicaciones técnicas
                 </p>
 
                 <div className="animate-fade-up-delay-3 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">

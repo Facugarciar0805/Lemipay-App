@@ -24,7 +24,7 @@
     --secondary: 240 10% 12%;
     --secondary-foreground: 0 0% 95%;
 
-    --muted: 240 10% 14%;
+    --muted: 240 10% 15%;
     --muted-foreground: 240 5% 55%;
 
     --accent: 240 10% 18%;
@@ -42,6 +42,10 @@
     /* --- VARIABLES DE MARCA LEMIPAY (Solo para Landing) --- */
     --brand-lime: 84 81% 44%;
     --brand-purple: 271 81% 56%;
+    --lime: 84 81% 44%;
+    --lime-glow: 84 81% 55%;
+    --purple: 271 81% 56%;
+    --purple-glow: 263 70% 50%;
   }
 }
 
@@ -57,17 +61,33 @@
 }
 
 @layer components {
-  /* Efecto Cristal con el violeta de marca */
+  .glass-card {
+    @apply bg-card/40 backdrop-blur-xl border border-border/50 rounded-2xl;
+    box-shadow: 0 0 30px -10px hsl(var(--purple) / 0.15);
+  }
+
+  .glow-lime {
+    box-shadow: 0 0 20px hsl(var(--lime) / 0.4), 0 0 60px hsl(var(--lime) / 0.15);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px hsl(var(--purple) / 0.4), 0 0 60px hsl(var(--purple) / 0.15);
+  }
   .glass-card {
     @apply bg-card/40 backdrop-blur-xl border border-border/50 rounded-2xl;
     box-shadow: 0 0 40px -10px hsla(271, 81%, 56%, 0.15);
   }
 
   .gradient-text {
-    /* Si quieres que el título sea verde lima brillante */
-    @apply text-primary;
-    /* O si prefieres que sea blanco y solo resalten los iconos */
-    /* @apply text-foreground; */
+    /* Forzamos el color verde lima de Lemipay */
+    color: hsl(var(--brand-lime));
+
+    /* El secreto de Lovable: múltiples capas de brillo */
+    filter: drop-shadow(0 0 12px hsla(var(--brand-lime) / 0.5))
+    drop-shadow(0 0 25px hsla(var(--brand-lime) / 0.2));
+
+    /* Aseguramos que el brillo no se corte en algunos navegadores */
+    display: inline-block;
   }
 
   /* El fondo violeta que querías para items específicos de la landing */
@@ -77,6 +97,8 @@
 }
 
 @layer utilities {
+  .animate-float {animation: float 6s ease-in-out infinite;}
+  .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite;}
   .animate-fade-up { animation: fade-up 0.6s ease-out both; }
   .animate-fade-up-delay-1 { animation: fade-up 0.6s ease-out 0.15s both; }
   .animate-fade-up-delay-2 { animation: fade-up 0.6s ease-out 0.3s both; }
