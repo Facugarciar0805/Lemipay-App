@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
 
 import './globals.css'
-import { WalletProvider } from '@/context/wallet-context'
 
 const _inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const _spaceMono = Space_Mono({
@@ -28,9 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${_inter.variable} ${_spaceMono.variable}`}>
-      <body className="font-sans antialiased">
-        <WalletProvider>{children}</WalletProvider>
-      </body>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   )
 }

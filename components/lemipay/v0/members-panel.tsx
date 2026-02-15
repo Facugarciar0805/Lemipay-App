@@ -4,12 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Group } from "@/lib/stellar-client"
-import { useWallet } from "@/context/wallet-context"
 import { Users } from "lucide-react"
 
 interface MembersPanelProps {
   group: Group | null
   isLoading: boolean
+  currentAddress?: string | null
 }
 
 const MEMBER_NAMES = ["Alex", "Sam", "Jordan"]
@@ -19,9 +19,11 @@ const MEMBER_COLORS = [
   "bg-chart-4/20 text-chart-4",
 ]
 
-export function MembersPanel({ group, isLoading }: MembersPanelProps) {
-  const { address } = useWallet()
-
+export function MembersPanel({
+  group,
+  isLoading,
+  currentAddress = null,
+}: MembersPanelProps) {
   if (isLoading) {
     return <MembersSkeleton />
   }
@@ -38,7 +40,7 @@ export function MembersPanel({ group, isLoading }: MembersPanelProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {group.members.map((member, i) => {
-          const isYou = member === address
+          const isYou = member === currentAddress
           const shortAddr = `${member.slice(0, 6)}...${member.slice(-4)}`
           return (
             <div
