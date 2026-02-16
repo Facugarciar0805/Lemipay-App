@@ -7,11 +7,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { CreateGroupModal } from "@/components/modal/CreateGroupModal"
 import { cn } from "@/lib/utils"
 
-const mockGroups = [
-    { id: "1", name: "Proyecto Alpha DAO", members: 5, balance: "12,450 USDC", pending: 2, color: "primary" },
-    { id: "2", name: "Viaje Europa 2026", members: 4, balance: "3,200 USDC", pending: 1, color: "secondary" },
-]
-
 interface ProfileViewProps {
     address: string
     onSelectGroup: (groupId: string) => void
@@ -35,6 +30,10 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
     const [displayName, setDisplayName] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
 
+    // NUEVO: Estado para los grupos reales
+    const [groups, setGroups] = useState<any[]>([])
+    const [isLoadingGroups, setIsLoadingGroups] = useState(true)
+
     const copyAddress = () => {
         navigator.clipboard.writeText(address).then(() => {
             setCopied(true)
@@ -42,6 +41,7 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
         })
     }
 
+    // 1. Fetch Balance USDC
     useEffect(() => {
         let cancelled = false
         setUsdcBalance(null)
@@ -56,6 +56,7 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
         return () => { cancelled = true }
     }, [address])
 
+    // 2. Fetch Profile Display Name
     useEffect(() => {
         let cancelled = false
         fetch("/api/profile", { credentials: "include" })
@@ -73,8 +74,32 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
         return () => { cancelled = true }
     }, [])
 
+    // 3. NUEVO: Fetch Grupos desde Supabase (vía API)
+    useEffect(() => {
+        let cancelled = false
+        setIsLoadingGroups(true)
+
+        // Llamamos al endpoint que usa la función getWalletGroups que armamos
+        fetch(`/api/groups?address=${encodeURIComponent(address)}`)
+            .then((res) => res.json())
+            .then((data: { groups: any[] }) => {
+                if (!cancelled) {
+                    setGroups(data.groups || [])
+                    setIsLoadingGroups(false)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setGroups([])
+                    setIsLoadingGroups(false)
+                }
+            })
+        return () => { cancelled = true }
+    }, [address])
+
     return (
         <main className="container mx-auto max-w-4xl px-4 pt-10 pb-16">
+            {/* Profile Card */}
             <div className="glass-card gradient-border mb-10 overflow-hidden p-1 animate-fade-up">
                 <div className="rounded-xl bg-background/60 p-6 md:p-8">
                     <div className="flex flex-col items-center gap-6 sm:flex-row">
@@ -92,24 +117,11 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
                                     <span className="font-mono text-xs text-muted-foreground/70">
                                         {address.slice(0, 6)}…{address.slice(-6)}
                                     </span>
-                                    <span
-                                        className={cn(
-                                            "inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-opacity group-hover:opacity-100",
-                                            copied ? "opacity-100" : "opacity-0"
-                                        )}
-                                        title={address}
-                                    >
-                                        {copied ? (
-                                            <>
-                                                <Check className="h-3 w-3 text-primary" />
-                                                Copiado
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="h-3 w-3" />
-                                                Copiar
-                                            </>
-                                        )}
+                                    <span className={cn(
+                                        "inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-opacity group-hover:opacity-100",
+                                        copied ? "opacity-100" : "opacity-0"
+                                    )}>
+                                        {copied ? <><Check className="h-3 w-3 text-primary" /> Copiado</> : <><Copy className="h-3 w-3" /> Copiar</>}
                                     </span>
                                 </div>
                             </div>
@@ -131,6 +143,7 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
                 </div>
             </div>
 
+            {/* Groups Section */}
             <div className="animate-fade-up-delay-1">
                 <div className="mb-6 flex items-center justify-between">
                     <h2 className="font-display text-xl font-bold text-foreground">Tus Grupos</h2>
@@ -139,22 +152,48 @@ export function ProfileView({ address, onSelectGroup, onDisconnect }: ProfileVie
                     </Button>
                 </div>
 
-                <div className="grid gap-4">
-                    {mockGroups.map((group) => (
-                        <button key={group.id} onClick={() => onSelectGroup(group.id)} className="glass-card w-full rounded-2xl p-1 text-left hover:scale-[1.01] transition-all">
-                            <div className="flex items-center gap-4 rounded-xl bg-background/60 p-6">
-                                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${group.color === "primary" ? "bg-primary/15 text-primary" : "bg-brand-purple/15 text-brand-purple"}`}>
-                                    <Users className="h-6 w-6" />
+                {isLoadingGroups ? (
+                    <div className="flex justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+                    </div>
+                ) : groups.length === 0 ? (
+                    <div className="glass-card rounded-2xl border border-dashed border-border p-12 text-center">
+                        <Users className="mx-auto h-12 w-12 text-muted-foreground/20" />
+                        <p className="mt-4 text-sm text-muted-foreground">Aún no perteneces a ningún grupo.</p>
+                        <Button onClick={() => setShowCreateGroup(true)} variant="link" className="mt-2 text-primary">
+                            Crea tu primer grupo ahora
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="grid gap-4">
+                        {groups.map((group, i) => (
+                            <button
+                                key={group.id}
+                                onClick={() => onSelectGroup(group.id)}
+                                className="glass-card w-full rounded-2xl p-1 text-left hover:scale-[1.01] transition-all"
+                                style={{ animationDelay: `${i * 100}ms` }}
+                            >
+                                <div className="flex items-center gap-4 rounded-xl bg-background/60 p-6">
+                                    <div className={cn(
+                                        "flex h-12 w-12 items-center justify-center rounded-xl",
+                                        i % 2 === 0 ? "bg-primary/15 text-primary" : "bg-brand-purple/15 text-brand-purple"
+                                    )}>
+                                        <Users className="h-6 w-6" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-display text-base font-semibold">
+                                            {group.name || `Grupo #${group.id}`}
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground">
+                                            {group.member_count || '—'} miembros · {group.balance || '0.00'} USDC
+                                        </p>
+                                    </div>
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 </div>
-                                <div className="flex-1">
-                                    <h3 className="font-display text-base font-semibold">{group.name}</h3>
-                                    <p className="text-xs text-muted-foreground">{group.members} miembros · {group.balance}</p>
-                                </div>
-                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                        </button>
-                    ))}
-                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <CreateGroupModal

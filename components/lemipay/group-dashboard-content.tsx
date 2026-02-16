@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { MembersPanel } from "@/components/lemipay/v0/members-panel";
+import { ContributionsPanel } from "./contributions-panel";
 
 export interface GroupDashboardContentProps {
     group: Group | null
@@ -29,6 +30,7 @@ export interface GroupDashboardContentProps {
     onApproveProposal: (proposalId: bigint) => Promise<void>
     onExecuteRelease: (proposalId: bigint) => Promise<void>
     isSubmitting: boolean
+    memberContributions: { address: string; name?: string; totalAmount: bigint }[];
 }
 
 export function GroupDashboardContent({
@@ -43,6 +45,7 @@ export function GroupDashboardContent({
                                           onApproveProposal,
                                           onExecuteRelease,
                                           isSubmitting,
+                                          memberContributions,
                                       }: GroupDashboardContentProps) {
 
     // Función auxiliar interna compatible con ES anteriores a 2020
@@ -210,6 +213,15 @@ export function GroupDashboardContent({
                     </div>
                 )}
             </section>
+            {/* ─── 4. Contributions Panel ─── */}
+
+            <section>
+                <ContributionsPanel
+                    contributions={memberContributions}
+                    isLoading={isLoading}
+                />
+            </section>
+
         </main>
     );
 }

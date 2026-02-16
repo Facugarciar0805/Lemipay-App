@@ -45,15 +45,6 @@ export function GroupCard({ group, totalBalance, isLoading }: GroupCardProps) {
                 {group.members.length} miembros
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
-              <Badge
-                variant="outline"
-                className="text-xs border-primary/30 text-primary"
-              >
-                {group.approvalsRequired} firmas requeridas
-              </Badge>
-            </div>
           </div>
         </div>
       </CardContent>

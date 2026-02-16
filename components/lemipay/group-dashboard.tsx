@@ -13,6 +13,7 @@ export function GroupDashboard({ address, onBack }: GroupDashboardProps) {
     group,
     fundRounds,
     proposals,
+    memberContributions,
     isLoading,
     totalBalance,
     contribute,
@@ -26,6 +27,7 @@ export function GroupDashboard({ address, onBack }: GroupDashboardProps) {
       group={group}
       fundRounds={fundRounds}
       proposals={proposals}
+      memberContributions={memberContributions}
       totalBalance={totalBalance}
       isLoading={isLoading}
       address={address}
