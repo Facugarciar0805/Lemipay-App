@@ -13,6 +13,7 @@ import {
   getSorobanServer,
   CREATE_GROUP_CONTRACT_ID,
   STELLAR_CONFIG,
+  checkTreasuryExists,
 } from "@/lib/stellar-client"
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants"
 import { verifySessionToken } from "@/lib/auth/jwt"
@@ -115,6 +116,7 @@ export default async function GroupPage({
         publicKey={publicKey}
         groupId={id ?? ""}
         group={null}
+        hasTreasury={false}
         status="invalid_id"
       />
     )
@@ -127,17 +129,21 @@ export default async function GroupPage({
         publicKey={publicKey}
         groupId={String(groupId)}
         group={null}
+        hasTreasury={false}
         status="not_found"
       />
     )
   }
 
   const group: Group = toGroup(groupId, sorobanGroup)
+  const hasTreasury = await checkTreasuryExists(groupId, publicKey)
+
   return (
     <GroupPageView
       publicKey={publicKey}
       groupId={String(groupId)}
       group={group}
+      hasTreasury={hasTreasury}
       status="ok"
     />
   )

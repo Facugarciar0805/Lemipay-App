@@ -22,12 +22,14 @@ export interface GroupDashboardContentProps {
     fundRounds: FundRound[]
     proposals: ReleaseProposal[]
     totalBalance: bigint
+    hasTreasury?: boolean
     isLoading: boolean
     address: string
     onBack: () => void
     onContribute: (roundIndex: number, amount: bigint) => Promise<void>
     onApproveProposal: (proposalId: bigint) => Promise<void>
     onExecuteRelease: (proposalId: bigint) => Promise<void>
+    onCrearTreasury?: () => Promise<void>
     isSubmitting: boolean
 }
 
@@ -36,12 +38,14 @@ export function GroupDashboardContent({
                                           fundRounds,
                                           proposals,
                                           totalBalance,
+                                          hasTreasury = true,
                                           isLoading,
                                           address,
                                           onBack,
                                           onContribute,
                                           onApproveProposal,
                                           onExecuteRelease,
+                                          onCrearTreasury,
                                           isSubmitting,
                                       }: GroupDashboardContentProps) {
 
@@ -82,22 +86,39 @@ export function GroupDashboardContent({
                 Mis Grupos
             </button>
 
-            {/* ─── 1. HERO BALANCE ─── */}
+            {/* ─── 1. HERO BALANCE o CREAR TESORERÍA ─── */}
             <section className="glass-card gradient-border mb-8 overflow-hidden p-1 animate-fade-up">
                 <div className="rounded-xl bg-background/60 p-8 text-center md:p-12">
                     <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         {group?.name || "Tesorería Grupal"}
                     </p>
-                    <p
-                        className="mt-4 font-display text-5xl font-bold text-primary sm:text-6xl md:text-7xl"
-                        style={{ textShadow: "0 0 30px hsla(var(--brand-lime), 0.35), 0 0 60px hsla(var(--brand-lime), 0.15)" }}
-                    >
-                        {totalBalance}
-                        <span className="ml-2 text-lg font-normal text-muted-foreground sm:text-xl">USDC</span>
-                    </p>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                        Quórum: <span className="font-semibold text-brand-purple">{group?.threshold || 2}</span> firmas requeridas
-                    </p>
+                    {hasTreasury ? (
+                        <>
+                            <p
+                                className="mt-4 font-display text-5xl font-bold text-primary sm:text-6xl md:text-7xl"
+                                style={{ textShadow: "0 0 30px hsla(var(--brand-lime), 0.35), 0 0 60px hsla(var(--brand-lime), 0.15)" }}
+                            >
+                                {totalBalance}
+                                <span className="ml-2 text-lg font-normal text-muted-foreground sm:text-xl">USDC</span>
+                            </p>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                Quórum: <span className="font-semibold text-brand-purple">{group?.threshold ?? 2}</span> firmas requeridas
+                            </p>
+                        </>
+                    ) : (
+                        <div className="mt-6">
+                            <Button
+                                disabled={isSubmitting}
+                                onClick={() => onCrearTreasury?.()}
+                                className="rounded-xl bg-primary px-8 py-3 font-bold text-primary-foreground hover:glow-lime"
+                            >
+                                CREAR TESORERÍA
+                            </Button>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                Este grupo aún no tiene tesorería. Créala para poder fondear y gestionar pagos.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </section>
 

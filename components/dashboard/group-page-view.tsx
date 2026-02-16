@@ -11,6 +11,7 @@ import Footer from "@/components/landing/Footer"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import type { Group } from "@/lib/stellar-client"
+import { useCreateTreasury } from "@/hooks/useCreateTreasury"
 
 export type GroupPageStatus = "ok" | "invalid_id" | "not_found"
 
@@ -18,6 +19,7 @@ export interface GroupPageViewProps {
   publicKey: string
   groupId: string
   group: Group | null
+  hasTreasury: boolean
   status: GroupPageStatus
 }
 
@@ -32,11 +34,29 @@ export function GroupPageView({
   publicKey,
   groupId,
   group,
+  hasTreasury,
   status,
 }: GroupPageViewProps) {
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [logoutError, setLogoutError] = useState<string | null>(null)
+
+  const {
+    createTreasury,
+    isLoading: isCreatingTreasury,
+    error: createTreasuryError,
+    reset: resetCreateTreasury,
+  } = useCreateTreasury()
+
+  const onCrearTreasury = useCallback(async () => {
+    if (!groupId) return
+    const groupIdBigInt = BigInt(groupId)
+    const hash = await createTreasury(groupIdBigInt)
+    if (hash) {
+      resetCreateTreasury()
+      router.refresh()
+    }
+  }, [groupId, createTreasury, resetCreateTreasury, router])
 
   const onLogout = useCallback(async () => {
     if (isLoggingOut) return
@@ -137,18 +157,28 @@ export function GroupPageView({
           </div>
         </section>
       ) : null}
+      {createTreasuryError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{createTreasuryError.message}</p>
+          </div>
+        </section>
+      ) : null}
       <GroupDashboardContent
         group={group}
         fundRounds={[]}
         proposals={[]}
         totalBalance={BigInt(0)}
+        hasTreasury={hasTreasury}
         isLoading={false}
         address={publicKey}
         onBack={onBack}
         onContribute={noopContribute}
         onApproveProposal={noopApprove}
         onExecuteRelease={noopExecute}
-        isSubmitting={false}
+        onCrearTreasury={onCrearTreasury}
+        isSubmitting={isCreatingTreasury}
       />
       <Footer />
     </div>
