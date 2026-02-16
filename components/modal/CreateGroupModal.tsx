@@ -31,26 +31,25 @@ import { cn } from "@/lib/utils"
 const STELLAR_ADDRESS_REGEX = /^[GC][A-Z2-7]{55}$/
 
 const createGroupSchema = z
-  .object({
-    members: z.array(z.string()),
-    approvals_required: z
-      .number({ invalid_type_error: "Debe ser un número" })
-      .int("Debe ser un número entero")
-      .min(1, "Mínimo 1 aprobación"),
-  })
-  .refine(
-    (data) => {
-      const valid = data.members.map((s) => s.trim()).filter(Boolean)
-      return valid.length >= 1 && valid.every((a) => STELLAR_ADDRESS_REGEX.test(a))
-    },
-    {
-      message: "Al menos una dirección válida (G... o C..., 56 caracteres)",
-      path: ["members"],
-    }
-  )
+    .object({
+      members: z.array(z.string()),
+      approvals_required: z
+          .number({ invalid_type_error: "Debe ser un número" })
+          .int("Debe ser un número entero")
+          .min(1, "Mínimo 1 aprobación"),
+    })
+    .refine(
+        (data) => {
+          const valid = data.members.map((s) => s.trim()).filter(Boolean)
+          return valid.length >= 1 && valid.every((a) => STELLAR_ADDRESS_REGEX.test(a))
+        },
+        {
+          message: "Al menos una dirección válida (G... o C..., 56 caracteres)",
+          path: ["members"],
+        }
+    )
 
 export type CreateGroupFormValues = z.infer<typeof createGroupSchema>
-
 const STELLAR_EXPERT_TX_URL = "https://stellar.expert/explorer/testnet/tx"
 
 export interface CreateGroupModalProps {
@@ -77,28 +76,34 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
     },
   })
 
+  const { reset: resetForm } = form
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "members",
   })
 
+  // Función para resetear estados de forma limpia
+  const handleReset = useCallback(() => {
+    resetForm({ members: [""], approvals_required: 1 })
+    resetCreateGroup()
+  }, [resetForm, resetCreateGroup])
+
   const handleClose = useCallback(
-    (isOpen: boolean) => {
-      if (!isOpen) {
-        form.reset({ members: [""], approvals_required: 1 })
-        resetCreateGroup()
-      }
-      onOpenChange(isOpen)
-    },
-    [form, resetCreateGroup, onOpenChange]
+      (isOpen: boolean) => {
+        if (!isOpen) {
+          handleReset()
+        }
+        onOpenChange(isOpen)
+      },
+      [handleReset, onOpenChange]
   )
 
+  // Este useEffect ya no provocará bucles infinitos porque handleReset es estable
   useEffect(() => {
     if (!open) {
-      form.reset({ members: [""], approvals_required: 1 })
-      resetCreateGroup()
+      handleReset()
     }
-  }, [open, form, resetCreateGroup])
+  }, [open, handleReset])
 
   async function onSubmit(values: CreateGroupFormValues) {
     const members = values.members.map((m) => m.trim()).filter(Boolean)
@@ -106,23 +111,9 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
       members,
       approvals_required: values.approvals_required,
     })
-    if (result?.groupId && result.members?.length) {
-      try {
-        await fetch("/api/groups/sync-members", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            groupId: result.groupId,
-            members: result.members,
-          }),
-          credentials: "include",
-        })
-      } catch {
-        // Grupo ya creado on-chain; el listado en Supabase se puede corregir después
-      }
-      handleClose(false)
-      router.push(`/groups/${result.groupId}`)
-    } else if (result?.groupId) {
+
+    // Si el grupo se creó con éxito (el hook ya se encargó de Supabase vía /api/groups/link)
+    if (result?.groupId) {
       handleClose(false)
       router.push(`/groups/${result.groupId}`)
     }
@@ -131,188 +122,116 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
   const showSuccess = Boolean(txHash) && !error && !isLoading
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent
-        className={cn(
-          "sm:max-w-md min-w-0 overflow-hidden",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
-        )}
-      >
-        <DialogHeader className="min-w-0">
-          <DialogTitle>Crear grupo</DialogTitle>
-          <DialogDescription className="break-words">
-            Definí los miembros del grupo y cuántas aprobaciones se necesitan
-            para retirar fondos. Vas a firmar con Freighter.
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md min-w-0 overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Crear grupo</DialogTitle>
+            <DialogDescription>
+              Definí los miembros y el quórum necesario. Firmarás con Freighter.
+            </DialogDescription>
+          </DialogHeader>
 
-        {!isWalletAvailable && (
-          <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-            Necesitás Freighter para crear un grupo.{" "}
-            <a
-              href="https://www.freighterapp.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:no-underline"
-            >
-              Instalar Freighter
-            </a>
-          </div>
-        )}
-
-        {error && (
-          <div
-            className="max-h-40 overflow-y-auto overflow-x-auto rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-            role="alert"
-          >
-            <pre className="whitespace-pre-wrap break-words font-sans">
-              {error.message}
-            </pre>
-          </div>
-        )}
-
-        {showSuccess ? (
-          <div className="min-w-0 space-y-4 py-2">
-            <div className="flex items-center gap-2 rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-400">
-              <CheckCircle2 className="h-5 w-5 shrink-0" />
-              <span>Grupo creado correctamente.</span>
-            </div>
-            <div className="min-w-0 space-y-1">
-              <Label className="text-muted-foreground">Transaction hash</Label>
-              <div className="flex min-w-0 items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1.5 text-xs">
-                  {txHash}
-                </code>
-                <a
-                  href={`${STELLAR_EXPERT_TX_URL}/${txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 text-primary hover:underline"
-                  aria-label="Ver en Stellar Expert"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
+          {!isWalletAvailable && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
+                Necesitás Freighter para crear un grupo.
               </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={() => handleClose(false)}>Cerrar</Button>
-            </DialogFooter>
-          </div>
-        ) : (
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4 py-2"
-            >
-              <div className="space-y-3">
-                <FormLabel>Miembros del grupo</FormLabel>
-                <div className="space-y-2">
-                  {fields.map((field, index) => (
-                    <FormField
-                      key={field.id}
-                      control={form.control}
-                      name={`members.${index}`}
-                      render={({ field }) => (
-                        <FormItem className="space-y-0">
-                          <FormControl>
-                            <div className="flex gap-2">
-                              <Input
-                                placeholder="G... o C... (56 caracteres)"
-                                className="font-mono text-sm"
-                                disabled={!isWalletAvailable || isLoading}
-                                {...field}
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="shrink-0 text-muted-foreground hover:text-destructive"
-                                onClick={() => remove(index)}
-                                disabled={fields.length <= 1 || !isWalletAvailable || isLoading}
-                                aria-label="Quitar miembro"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ))}
+          )}
+
+          {error && (
+              <div className="max-h-40 overflow-auto rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <pre className="whitespace-pre-wrap">{error.message}</pre>
+              </div>
+          )}
+
+          {showSuccess ? (
+              <div className="space-y-4 py-2 text-center">
+                <div className="flex items-center gap-2 rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-green-700">
+                  <CheckCircle2 className="h-5 w-5 shrink-0" />
+                  <span>Grupo creado correctamente.</span>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-2"
-                  onClick={() => append("")}
-                  disabled={!isWalletAvailable || isLoading}
-                >
-                  <Plus className="h-4 w-4" />
-                  Agregar miembro
-                </Button>
-                {form.formState.errors.members?.message && (
-                  <p className="text-sm font-medium text-destructive">
-                    {form.formState.errors.members.message}
-                  </p>
-                )}
+                <DialogFooter>
+                  <Button onClick={() => handleClose(false)}>Ir al Dashboard</Button>
+                </DialogFooter>
               </div>
+          ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
+                  <div className="space-y-3">
+                    <FormLabel>Miembros del grupo</FormLabel>
+                    <div className="space-y-2">
+                      {fields.map((field, index) => (
+                          <FormField
+                              key={field.id}
+                              control={form.control}
+                              name={`members.${index}`}
+                              render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <div className="flex gap-2">
+                                        <Input
+                                            placeholder="G... o C..."
+                                            className="font-mono text-sm"
+                                            disabled={isLoading}
+                                            {...field}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => remove(index)}
+                                            disabled={fields.length <= 1 || isLoading}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      ))}
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        onClick={() => append("")}
+                        disabled={isLoading}
+                    >
+                      <Plus className="h-4 w-4" /> Agregar miembro
+                    </Button>
+                  </div>
 
-              <FormField
-                control={form.control}
-                name="approvals_required"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Aprobaciones necesarias para retirar</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        step={1}
-                        placeholder="1"
-                        disabled={!isWalletAvailable || isLoading}
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(
-                            e.target.value === ""
-                              ? undefined
-                              : Number(e.target.value)
-                          )
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                      control={form.control}
+                      name="approvals_required"
+                      render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Firmas requeridas</FormLabel>
+                            <FormControl>
+                              <Input
+                                  type="number"
+                                  min={1}
+                                  disabled={isLoading}
+                                  {...field}
+                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                      )}
+                  />
 
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleClose(false)}
-                  disabled={isLoading}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={!isWalletAvailable || isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creando…
-                    </>
-                  ) : (
-                    "Crear grupo"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        )}
-      </DialogContent>
-    </Dialog>
+                  <DialogFooter>
+                    <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear grupo"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+          )}
+        </DialogContent>
+      </Dialog>
   )
 }
