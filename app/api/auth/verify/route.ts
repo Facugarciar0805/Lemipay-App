@@ -13,6 +13,7 @@ import {
   STELLAR_TESTNET_NETWORK_PASSPHRASE,
 } from "@/lib/auth/constants";
 import { signSessionToken } from "@/lib/auth/jwt";
+import { syncWalletProfile } from "@/lib/supabase/sync-wallet-profile";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,7 @@ const verifyRequestSchema = z.object({
   publicKey: z.string().trim().min(1),
   signedMessage: z.string().trim().min(1),
   challenge: z.string().trim().min(1),
+  displayName: z.string().trim().optional(),
 });
 
 /**
@@ -78,7 +80,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const { publicKey, signedMessage, challenge } = parsedBody.data;
+    const { publicKey, signedMessage, challenge, displayName } = parsedBody.data;
 
     try {
       Keypair.fromPublicKey(publicKey);
@@ -127,6 +129,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Single-use: consume challenge only after successful verification.
     deleteChallenge(publicKey);
 
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        await syncWalletProfile(publicKey, displayName ?? null);
+      } catch (err) {
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console
+          console.error("[auth/verify] Supabase sync:", err);
+        }
+        return NextResponse.json(
+          { error: "Failed to sync wallet profile. Try again." },
+          { status: 500 },
+        );
+      }
+    }
+
     const sessionToken = await signSessionToken(publicKey);
     const response = NextResponse.json({ success: true, publicKey });
 
@@ -140,7 +157,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return response;
   } catch (err) {
-    console.error("[auth/verify]", err);
+    if (process.env.NODE_ENV === "development") {
+      // eslint-disable-next-line no-console
+      console.error("[auth/verify]", err);
+    }
     return NextResponse.json(
       { error: "Failed to verify authentication signature." },
       { status: 500 },

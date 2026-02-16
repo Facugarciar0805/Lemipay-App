@@ -10,6 +10,17 @@ import HowItWorks from "@/components/landing/HowItWorks";
 import DashboardPreview from "@/components/landing/DashboardPreview";
 import Footer from "@/components/landing/Footer";
 import { STELLAR_TESTNET_NETWORK_PASSPHRASE } from "@/lib/auth/constants";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface ChallengeResponse {
   challenge: string;
@@ -61,6 +72,10 @@ export default function LandingHome() {
   const router = useRouter();
   const [isConnecting, setIsConnecting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showDisplayNameModal, setShowDisplayNameModal] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const connectWallet = useCallback(async () => {
     if (isConnecting) {
@@ -143,8 +158,21 @@ export default function LandingHome() {
         );
       }
 
-      router.replace("/dashboard");
-      router.refresh();
+      // Cookie is set by verify response; check if profile already has display name
+      const profileRes = await fetch("/api/profile", { credentials: "include" });
+      const profileData = (await profileRes.json()) as {
+        displayName?: string | null;
+      };
+      const hasDisplayName =
+        typeof profileData.displayName === "string" &&
+        profileData.displayName.trim().length > 0;
+
+      if (hasDisplayName) {
+        router.replace("/dashboard");
+        router.refresh();
+      } else {
+        setShowDisplayNameModal(true);
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -155,6 +183,41 @@ export default function LandingHome() {
       setIsConnecting(false);
     }
   }, [isConnecting, router]);
+
+  const handleDisplayNameSubmit = useCallback(async () => {
+    const name = displayName.trim();
+    if (!name) {
+      setDisplayNameError("Escribí un nombre para continuar.");
+      return;
+    }
+    setDisplayNameError(null);
+    setIsSavingProfile(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: name }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok || !data.success) {
+        setDisplayNameError(data.error ?? "No se pudo guardar. Intentá de nuevo.");
+        return;
+      }
+      setShowDisplayNameModal(false);
+      router.replace("/dashboard");
+      router.refresh();
+    } catch {
+      setDisplayNameError("Error de conexión. Intentá de nuevo.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }, [displayName, router]);
+
+  const handleSkipDisplayName = useCallback(() => {
+    setShowDisplayNameModal(false);
+    router.replace("/dashboard");
+    router.refresh();
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -193,6 +256,62 @@ export default function LandingHome() {
         <DashboardPreview walletConnected={false} />
       </main>
       <Footer />
+      <Dialog
+        open={showDisplayNameModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowDisplayNameModal(false);
+            router.replace("/dashboard");
+            router.refresh();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>¿Cómo te llamamos?</DialogTitle>
+            <DialogDescription>
+              Este nombre se mostrará en tu perfil y en los grupos. Podés cambiarlo después.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="display-name">Nombre para mostrar</Label>
+              <Input
+                id="display-name"
+                placeholder="Ej: María, Juan..."
+                value={displayName}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  setDisplayNameError(null);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleDisplayNameSubmit()}
+                disabled={isSavingProfile}
+                autoFocus
+              />
+              {displayNameError ? (
+                <p className="text-sm text-destructive">{displayNameError}</p>
+              ) : null}
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleSkipDisplayName}
+              disabled={isSavingProfile}
+            >
+              Omitir
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDisplayNameSubmit}
+              disabled={isSavingProfile}
+            >
+              {isSavingProfile ? "Guardando…" : "Continuar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
