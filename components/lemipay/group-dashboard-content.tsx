@@ -60,6 +60,7 @@ export function GroupDashboardContent({
                                           onCrearTreasury,
                                           onProposeFundRound,
                                           isSubmitting,
+                                          memberContributions,
                                           isProposingRound = false,
                                           isApprovingTokens = false,
                                           isContributing = false,
