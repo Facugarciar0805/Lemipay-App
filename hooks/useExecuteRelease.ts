@@ -5,35 +5,21 @@ import {
   Contract,
   TransactionBuilder,
   nativeToScVal,
-  scValToNative,
   BASE_FEE,
   rpc,
-  Address,
 } from "@stellar/stellar-sdk"
 import type { Account } from "@stellar/stellar-sdk"
 import freighterApi from "@stellar/freighter-api"
 import {
   getSorobanServer,
-  CREATE_GROUP_CONTRACT_ID,
+  TREASURY_CONTRACT_ID,
   STELLAR_CONFIG,
 } from "@/lib/stellar-client"
 
 const POLL_INTERVAL_MS = 2000
 const POLL_MAX_ATTEMPTS = 60
 
-export interface CreateGroupParams {
-  members: string[]
-  approvals_required: number
-}
-
-export interface CreateGroupResult {
-  txHash: string
-  groupId: string
-  /** Lista de todas las wallets del grupo (creador + miembros) para persistir en DB. */
-  members: string[]
-}
-
-export type CreateGroupErrorCode =
+export type ExecuteReleaseErrorCode =
   | "WALLET_NOT_INSTALLED"
   | "WALLET_NOT_CONNECTED"
   | "USER_REJECTED"
@@ -42,42 +28,30 @@ export type CreateGroupErrorCode =
   | "TX_FAILED"
   | "UNKNOWN"
 
-export interface CreateGroupError {
-  code: CreateGroupErrorCode
+export interface ExecuteReleaseError {
+  code: ExecuteReleaseErrorCode
   message: string
 }
 
-function isCreateGroupError(err: unknown): err is CreateGroupError {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    "message" in err
-  )
-}
-
-/** Get current wallet address via @stellar/freighter-api (same as login). */
 async function getPublicKey(): Promise<string> {
   if (typeof window === "undefined") {
     throw {
       code: "WALLET_NOT_INSTALLED" as const,
       message: "Freighter no está disponible. Instalá la extensión y recargá.",
-    } satisfies CreateGroupError
+    } satisfies ExecuteReleaseError
   }
   const connectedRes = await freighterApi.isConnected()
-  if (connectedRes.error) {
-    throw {
-      code: "WALLET_NOT_CONNECTED" as const,
-      message:
-        connectedRes.error.message ??
-        "No se pudo conectar con Freighter. Desbloqueá la wallet.",
-    } satisfies CreateGroupError
-  }
-  if (!connectedRes.isConnected) {
-    throw {
-      code: "WALLET_NOT_CONNECTED" as const,
-      message: "Abrí Freighter y desbloqueá tu wallet.",
-    } satisfies CreateGroupError
+  if (connectedRes.error || !connectedRes.isConnected) {
+    const accessRes = await freighterApi.requestAccess()
+    if (accessRes.error || !accessRes.address) {
+      throw {
+        code: "WALLET_NOT_CONNECTED" as const,
+        message:
+          accessRes.error?.message ??
+          "Autorizá este sitio en Freighter para ejecutar el pago.",
+      } satisfies ExecuteReleaseError
+    }
+    return accessRes.address
   }
   const addressRes = await freighterApi.getAddress()
   if (addressRes.error || !addressRes.address) {
@@ -87,9 +61,9 @@ async function getPublicKey(): Promise<string> {
         code: "WALLET_NOT_CONNECTED" as const,
         message:
           accessRes.error?.message ??
-          "Autorizá este sitio en Freighter para crear grupos.",
-      } satisfies CreateGroupError
-      }
+          "Autorizá este sitio en Freighter para ejecutar el pago.",
+      } satisfies ExecuteReleaseError
+    }
     return accessRes.address
   }
   return addressRes.address
@@ -116,60 +90,39 @@ async function pollTransaction(
     if (response.status === rpc.Api.GetTransactionStatus.FAILED) {
       throw {
         code: "TX_FAILED" as const,
-        message: "Transaction failed on the network.",
-      } satisfies CreateGroupError
+        message: "La transacción falló en la red.",
+      } satisfies ExecuteReleaseError
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
   }
   throw {
     code: "TX_FAILED" as const,
-    message: "Transaction timed out. Check the network or try again.",
-  } satisfies CreateGroupError
+    message: "Tiempo de espera agotado. Revisá la red o intentá de nuevo.",
+  } satisfies ExecuteReleaseError
 }
 
-export function useCreateGroup() {
+/**
+ * execute_release(proposal_id: u64) - ejecuta el pago de una propuesta que alcanzó el quórum.
+ */
+export function useExecuteRelease() {
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<CreateGroupError | null>(null)
-  const [txHash, setTxHash] = useState<string | null>(null)
+  const [error, setError] = useState<ExecuteReleaseError | null>(null)
 
-  const createGroup = useCallback(
-    async (params: CreateGroupParams): Promise<CreateGroupResult | null> => {
+  const executeRelease = useCallback(
+    async (proposalId: bigint): Promise<string | null> => {
       setIsLoading(true)
       setError(null)
-      setTxHash(null)
 
       try {
         const publicKey = await getPublicKey()
         const server = getSorobanServer()
 
         const account: Account = await server.getAccount(publicKey)
-        const contract = new Contract(CREATE_GROUP_CONTRACT_ID)
-
-        const approvalsRequired = Math.floor(params.approvals_required)
-        if (approvalsRequired < 1 || approvalsRequired > 0xffff_ffff) {
-          throw {
-            code: "SIMULATION_FAILED" as const,
-            message: "approvals_required must be between 1 and 4294967295",
-          } satisfies CreateGroupError
-        }
-        // Primero la address con la que me logué, después las que inputió el usuario
-        const allMembers = [publicKey, ...params.members.map((addr) => addr.trim()).filter(Boolean)]
-        if (allMembers.length < 2) {
-          throw {
-            code: "SIMULATION_FAILED" as const,
-            message: "Agregá al menos una dirección además de la tuya.",
-          } satisfies CreateGroupError
-        }
-
-        const membersScVal = nativeToScVal(
-          allMembers.map((addr) => Address.fromString(addr)),
-          { type: "vec" }
-        )
+        const contract = new Contract(TREASURY_CONTRACT_ID)
 
         const invokeOp = contract.call(
-          "create_group",
-          membersScVal,
-          nativeToScVal(approvalsRequired, { type: "u32" })
+          "execute_release",
+          nativeToScVal(proposalId, { type: "u64" })
         )
 
         const builder = new TransactionBuilder(account, {
@@ -186,7 +139,7 @@ export function useCreateGroup() {
           throw {
             code: "SIMULATION_FAILED" as const,
             message: parseSimulationError(simulation),
-          } satisfies CreateGroupError
+          } satisfies ExecuteReleaseError
         }
 
         const preparedBuilder = rpc.assembleTransaction(rawTx, simulation)
@@ -207,17 +160,16 @@ export function useCreateGroup() {
             throw {
               code: "USER_REJECTED" as const,
               message: "Rechazaste la firma de la transacción.",
-            } satisfies CreateGroupError
+            } satisfies ExecuteReleaseError
           }
           throw {
             code: "USER_REJECTED" as const,
             message: msg,
-          } satisfies CreateGroupError
+          } satisfies ExecuteReleaseError
         }
-        const signedXdr = signRes.signedTxXdr
 
         const signedTx = TransactionBuilder.fromXDR(
-          signedXdr,
+          signRes.signedTxXdr,
           STELLAR_CONFIG.networkPassphrase
         )
         const sendResponse = await server.sendTransaction(signedTx)
@@ -226,42 +178,27 @@ export function useCreateGroup() {
           throw {
             code: "SEND_FAILED" as const,
             message:
-              "Transaction was rejected by the network. Try again or check your inputs.",
-          } satisfies CreateGroupError
+              "La red rechazó la transacción. Intentá de nuevo o revisá los datos.",
+          } satisfies ExecuteReleaseError
         }
 
         const hash = sendResponse.hash
         await pollTransaction(server, hash)
 
-        const txResponse = await server.getTransaction(hash)
-        if (txResponse.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
-          setTxHash(hash)
-          return { txHash: hash, groupId: "", members: allMembers }
-        }
-        const returnValue =
-          "returnValue" in txResponse ? txResponse.returnValue : undefined
-        const groupIdNative = returnValue
-          ? scValToNative(returnValue)
-          : undefined
-        const groupId =
-          groupIdNative !== undefined && groupIdNative !== null
-            ? String(groupIdNative)
-            : ""
-
-        setTxHash(hash)
-        return { txHash: hash, groupId, members: allMembers }
+        return hash
       } catch (err: unknown) {
-        if (isCreateGroupError(err)) {
-          setError(err)
+        if (
+          typeof err === "object" &&
+          err !== null &&
+          "code" in err &&
+          "message" in err
+        ) {
+          setError(err as ExecuteReleaseError)
           return null
         }
         const message =
-          err instanceof Error ? err.message : "An unexpected error occurred"
-        const createErr: CreateGroupError = {
-          code: "UNKNOWN",
-          message,
-        }
-        setError(createErr)
+          err instanceof Error ? err.message : "Ocurrió un error inesperado"
+        setError({ code: "UNKNOWN", message })
         return null
       } finally {
         setIsLoading(false)
@@ -272,15 +209,12 @@ export function useCreateGroup() {
 
   const reset = useCallback(() => {
     setError(null)
-    setTxHash(null)
   }, [])
 
   return {
-    createGroup,
+    executeRelease,
     isLoading,
     error,
-    txHash,
     reset,
-    isWalletAvailable: typeof window !== "undefined",
   }
 }

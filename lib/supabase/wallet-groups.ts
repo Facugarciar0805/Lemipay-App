@@ -28,6 +28,30 @@ export async function linkWalletToGroup(
 }
 
 /**
+ * Vincula todas las wallets de un grupo a la tabla wallet_groups.
+ * Se usa al crear un grupo para persistir cada miembro asociado al group_id.
+ */
+export async function linkWalletsToGroup(
+    groupId: number | bigint,
+    walletAddresses: string[]
+): Promise<void> {
+    if (walletAddresses.length === 0) return;
+    const supabase = getSupabaseAdmin();
+    const now = new Date().toISOString();
+    const rows = walletAddresses.map((wallet_address) => ({
+        wallet_address,
+        group_id: groupId,
+        created_at: now,
+    }));
+    const { error } = await supabase.from("wallet_groups").upsert(rows, {
+        onConflict: "wallet_address,group_id",
+    });
+    if (error) {
+        throw new Error(`Supabase linkWalletsToGroup error: ${error.message}`);
+    }
+}
+
+/**
  * Recupera todos los IDs de los grupos a los que pertenece una wallet.
  * Esta es la función que usarás para listar los grupos en el perfil del usuario.
  */

@@ -3,14 +3,19 @@ import { createClient } from "@supabase/supabase-js";
 const url = process.env.SUPABASE_URL?.trim() ?? "";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
 
-/** Decode JWT payload without verification (only to read role). */
+/** Decode JWT payload without verification (only to read role). Avoids Buffer() deprecation. */
 function getSupabaseKeyRole(key: string): string | null {
   try {
     const parts = key.split(".");
     if (parts.length < 2) return null;
-    const payload = JSON.parse(
-      Buffer.from(parts[1], "base64url").toString("utf8"),
-    ) as { role?: string };
+    const base64url = parts[1];
+    const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const json = new TextDecoder().decode(bytes);
+    const payload = JSON.parse(json) as { role?: string };
     return payload.role ?? null;
   } catch {
     return null;

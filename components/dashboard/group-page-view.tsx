@@ -16,6 +16,7 @@ import { useProposeFundRound } from "@/hooks/useProposeFundRound"
 import { useProposeRelease } from "@/hooks/useProposeRelease"
 import { useContributeToFundRound } from "@/hooks/useContributeToFundRound"
 import { useApproveRelease } from "@/hooks/useApproveRelease"
+import { useExecuteRelease } from "@/hooks/useExecuteRelease"
 
 export type GroupPageStatus = "ok" | "invalid_id" | "not_found"
 
@@ -90,6 +91,13 @@ export function GroupPageView({
     reset: resetApproveRelease,
   } = useApproveRelease()
 
+  const {
+    executeRelease,
+    isLoading: isExecutingRelease,
+    error: executeReleaseError,
+    reset: resetExecuteRelease,
+  } = useExecuteRelease()
+
   const onCrearTreasury = useCallback(async () => {
     if (!groupId) return
     const groupIdBigInt = BigInt(groupId)
@@ -153,7 +161,16 @@ export function GroupPageView({
     router.push("/dashboard")
   }, [router])
 
-  const noopExecute = useCallback(async () => {}, [])
+  const onExecuteRelease = useCallback(
+    async (proposalId: bigint) => {
+      const hash = await executeRelease(proposalId)
+      if (hash) {
+        resetExecuteRelease()
+        router.refresh()
+      }
+    },
+    [executeRelease, resetExecuteRelease, router]
+  )
 
   const onApproveProposal = useCallback(
     async (proposalId: bigint) => {
@@ -300,6 +317,14 @@ export function GroupPageView({
           </div>
         </section>
       ) : null}
+      {executeReleaseError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{executeReleaseError.message}</p>
+          </div>
+        </section>
+      ) : null}
       <GroupDashboardContent
         group={group}
         fundRounds={fundRounds}
@@ -312,11 +337,11 @@ export function GroupPageView({
         onApproveTokens={onApproveTokens}
         onContribute={onContribute}
         onApproveProposal={onApproveProposal}
-        onExecuteRelease={noopExecute}
+        onExecuteRelease={onExecuteRelease}
         onCreateProposal={onCreateProposal}
         onCrearTreasury={onCrearTreasury}
         onProposeFundRound={onProposeFundRound}
-        isSubmitting={isCreatingTreasury || isProposingRelease || isApprovingRelease}
+        isSubmitting={isCreatingTreasury || isProposingRelease || isApprovingRelease || isExecutingRelease}
         isProposingRound={isProposingRound}
         isApprovingTokens={isApprovingTokens}
         isContributing={isContributing}

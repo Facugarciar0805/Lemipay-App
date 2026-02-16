@@ -126,7 +126,7 @@ export function GroupDashboardContent({
                                 <span className="ml-2 text-lg font-normal text-muted-foreground sm:text-xl">USDC</span>
                             </p>
                             <p className="mt-3 text-xs text-muted-foreground">
-                                Quórum: <span className="font-semibold text-brand-purple">{group?.threshold ?? 2}</span> firmas requeridas
+                                Quórum: <span className="font-semibold text-brand-purple">{group?.approvalsRequired ?? 2}</span> firmas requeridas
                             </p>
                         </>
                     ) : (
@@ -194,7 +194,7 @@ export function GroupDashboardContent({
                         {proposals.map((p) => {
                             const currentApprovals = safeBigInt(p.approvals);
                             const threshold = group?.approvalsRequired ?? 2;
-                            const isReadyToExecute = currentApprovals >= threshold;
+                            const isReadyToExecute = !p.executed && currentApprovals >= threshold;
                             const description = (p as { description?: string }).description ?? `${p.destination.slice(0, 6)}…${p.destination.slice(-4)}`;
                             const amountUsdc = (Number(p.amount) / 1e7).toFixed(2);
 
@@ -213,7 +213,11 @@ export function GroupDashboardContent({
                                             </div>
                                         </div>
                                         <div className="shrink-0">
-                                            {isReadyToExecute ? (
+                                            {p.executed ? (
+                                                <span className="inline-flex items-center rounded-xl border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                                    Ejecutado
+                                                </span>
+                                            ) : isReadyToExecute ? (
                                                 <Button
                                                     disabled={isSubmitting}
                                                     onClick={() => onExecuteRelease(p.id)}
