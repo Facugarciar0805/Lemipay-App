@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatXlm } from "@/lib/stellar-client"
+import { formatUsdc } from "@/lib/stellar-client"
 import { xlmToStroops } from "@/lib/stellar-client"
 import type { FundRound } from "@/lib/stellar-client"
 import { Target, Check, Loader2, TrendingUp } from "lucide-react"
@@ -92,7 +92,7 @@ export function FundRoundProgress({
                   )}
                 </div>
                 <span className="text-xs font-mono text-muted-foreground">
-                  {formatXlm(round.fundedAmount)}/{formatXlm(round.totalAmount)} USDC
+                  {formatUsdc(round.fundedAmount)}/{formatUsdc(round.totalAmount)} USDC
                 </span>
               </div>
 

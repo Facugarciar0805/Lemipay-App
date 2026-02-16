@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { DashboardNavbar } from "@/components/dashboard/dashboard-navbar";
 import { ProfileView } from "@/components/lemipay/profile-view";
-import { GroupDashboard } from "@/components/lemipay/group-dashboard";
 import Footer from "@/components/landing/Footer";
 
 interface DashboardShellProps {
@@ -14,7 +13,6 @@ interface DashboardShellProps {
 
 export function DashboardShell({ publicKey }: DashboardShellProps) {
   const router = useRouter();
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
@@ -60,18 +58,11 @@ export function DashboardShell({ publicKey }: DashboardShellProps) {
           </section>
         ) : null}
 
-        {!selectedGroupId ? (
-          <ProfileView
-            address={publicKey}
-            onSelectGroup={(groupId) => setSelectedGroupId(groupId)}
-            onDisconnect={handleLogout}
-          />
-        ) : (
-          <GroupDashboard
-            address={publicKey}
-            onBack={() => setSelectedGroupId(null)}
-          />
-        )}
+        <ProfileView
+          address={publicKey}
+          onSelectGroup={(groupId) => router.push(`/groups/${groupId}`)}
+          onDisconnect={handleLogout}
+        />
       </main>
 
       <Footer />

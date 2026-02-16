@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatXlm } from "@/lib/stellar-client"
+import { formatUsdc } from "@/lib/stellar-client"
 import type { Group, ReleaseProposal } from "@/lib/stellar-client"
 import {
   Send,
@@ -128,7 +128,7 @@ export function ProposalList({
                     )}
                   </div>
                   <span className="text-lg font-mono font-bold text-foreground">
-                    {formatXlm(proposal.amount)}{" "}
+                    {formatUsdc(proposal.amount)}{" "}
                     <span className="text-sm text-muted-foreground font-normal">
                       USDC
                     </span>

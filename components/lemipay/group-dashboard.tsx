@@ -20,12 +20,20 @@ export function GroupDashboard({ address, onBack }: GroupDashboardProps) {
     isLoading,
     totalBalance,
     contribute,
+    createProposal,
     approveProposal,
     executeRelease,
     isSubmitting,
   } = useLemipay(address)
 
   const onApproveTokens = useCallback(async () => {}, [])
+
+  const onCreateProposal = useCallback(
+    async (params: { amountUsdc: number; destination: string; description?: string }) => {
+      await createProposal(params.amountUsdc, params.destination, params.description)
+    },
+    [createProposal]
+  )
 
   const onContribute = useCallback(
     async (roundId: bigint, amountUsdc: number) => {
@@ -51,6 +59,7 @@ export function GroupDashboard({ address, onBack }: GroupDashboardProps) {
       onContribute={onContribute}
       onApproveProposal={approveProposal}
       onExecuteRelease={executeRelease}
+      onCreateProposal={onCreateProposal}
       isSubmitting={isSubmitting}
       isContributing={isSubmitting}
     />

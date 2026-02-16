@@ -5,6 +5,7 @@ import {
   nativeToScVal,
   scValToNative,
   BASE_FEE,
+  Address,
 } from "@stellar/stellar-sdk"
 
 // Stellar / Soroban client configuration
@@ -68,6 +69,16 @@ export function formatXlm(stroops: bigint, decimals = 2): string {
 
 export function formatXlmFromNumber(amount: number, decimals = 2): string {
   return amount.toFixed(decimals)
+}
+
+// ─── USDC (7 decimals on Stellar: 1 USDC = 10_000_000 units) ──────
+export const USDC_DECIMALS = 10_000_000
+
+export function formatUsdc(amountRaw: bigint, decimals = 2): string {
+  const whole = amountRaw / BigInt(USDC_DECIMALS)
+  const frac = amountRaw % BigInt(USDC_DECIMALS)
+  const num = Number(whole) + Number(frac) / USDC_DECIMALS
+  return num.toFixed(decimals)
 }
 
 // ─── Treasury contract (read-only) ────────────────────────────────
@@ -240,6 +251,97 @@ export async function getGroupFundRounds(
     })
   }
   return rounds
+}
+
+/**
+ * Returns a user's contribution to a fund round (calls get_user_contribution on Treasury contract).
+ */
+export async function getUserContribution(
+  roundId: bigint,
+  userAddress: string,
+  sourceAddress: string
+): Promise<bigint> {
+  const server = getSorobanServer()
+  let account
+  try {
+    account = await server.getAccount(sourceAddress)
+  } catch {
+    return BigInt(0)
+  }
+  const contract = new Contract(TREASURY_CONTRACT_ID)
+  const invokeOp = contract.call(
+    "get_user_contribution",
+    nativeToScVal(roundId, { type: "u64" }),
+    nativeToScVal(Address.fromString(userAddress))
+  )
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_CONFIG.networkPassphrase,
+  })
+    .addOperation(invokeOp)
+    .setTimeout(60)
+  const rawTx = builder.build()
+  let simulation: rpc.Api.SimulateTransactionResponse
+  try {
+    simulation = await server.simulateTransaction(rawTx)
+  } catch {
+    return BigInt(0)
+  }
+  if (rpc.Api.isSimulationError(simulation)) return BigInt(0)
+  const result = simulation.result
+  if (!result?.retval) return BigInt(0)
+  try {
+    const decoded = scValToNative(result.retval) as bigint
+    return typeof decoded === "bigint" ? decoded : BigInt(0)
+  } catch {
+    return BigInt(0)
+  }
+}
+
+/** Per-member contribution and balance for the contributions panel. */
+export interface MemberContributionInfo {
+  address: string
+  /** Display name from wallet_profiles (optional). */
+  name?: string
+  totalAmount: bigint
+  /** Balance in USDC (display): positive = a favor, negative = debe aportar. */
+  balance: number
+}
+
+/**
+ * Fetches each member's total contribution across all rounds and computes balance (fair share - contribution).
+ */
+export async function getGroupMemberContributions(
+  groupId: bigint,
+  sourceAddress: string,
+  members: string[],
+  roundIds: bigint[]
+): Promise<MemberContributionInfo[]> {
+  const contributions: { address: string; totalAmount: bigint }[] = []
+
+  for (const address of members) {
+    let total = BigInt(0)
+    for (const roundId of roundIds) {
+      const amount = await getUserContribution(roundId, address, sourceAddress)
+      total += amount
+    }
+    contributions.push({ address, totalAmount: total })
+  }
+
+  const totalContributed = contributions.reduce((acc, c) => acc + c.totalAmount, BigInt(0))
+  const memberCount = members.length
+  const fairShareRaw =
+    memberCount > 0 ? totalContributed / BigInt(memberCount) : BigInt(0)
+
+  return contributions.map((c) => {
+    const balanceRaw = c.totalAmount - fairShareRaw
+    const balanceDisplay = Number(balanceRaw) / USDC_DECIMALS
+    return {
+      address: c.address,
+      totalAmount: c.totalAmount,
+      balance: balanceDisplay,
+    }
+  })
 }
 
 // ─── Types ──────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import Footer from "@/components/landing/Footer"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import type { Group, FundRound } from "@/lib/stellar-client"
+import type { Group, FundRound, MemberContributionInfo } from "@/lib/stellar-client"
 import { useCreateTreasury } from "@/hooks/useCreateTreasury"
 import { useProposeFundRound } from "@/hooks/useProposeFundRound"
 import { useContributeToFundRound } from "@/hooks/useContributeToFundRound"
@@ -23,6 +23,8 @@ export interface GroupPageViewProps {
   group: Group | null
   hasTreasury: boolean
   fundRounds: FundRound[]
+  totalBalance: bigint
+  memberContributions: MemberContributionInfo[]
   status: GroupPageStatus
 }
 
@@ -39,6 +41,8 @@ export function GroupPageView({
   group,
   hasTreasury,
   fundRounds,
+  totalBalance,
+  memberContributions,
   status,
 }: GroupPageViewProps) {
   const router = useRouter()
@@ -133,6 +137,14 @@ export function GroupPageView({
 
   const noopApprove = useCallback(async () => {}, [])
   const noopExecute = useCallback(async () => {}, [])
+
+  const onCreateProposal = useCallback(
+    async (_params: { amountUsdc: number; destination: string; description?: string }) => {
+      // TODO: wire to useCreateReleaseProposal when available
+      router.refresh()
+    },
+    [router]
+  )
 
   if (status === "invalid_id") {
     return (
@@ -239,7 +251,7 @@ export function GroupPageView({
         group={group}
         fundRounds={fundRounds}
         proposals={[]}
-        totalBalance={BigInt(0)}
+        totalBalance={totalBalance}
         hasTreasury={hasTreasury}
         isLoading={false}
         address={publicKey}
@@ -248,12 +260,14 @@ export function GroupPageView({
         onContribute={onContribute}
         onApproveProposal={noopApprove}
         onExecuteRelease={noopExecute}
+        onCreateProposal={onCreateProposal}
         onCrearTreasury={onCrearTreasury}
         onProposeFundRound={onProposeFundRound}
         isSubmitting={isCreatingTreasury}
         isProposingRound={isProposingRound}
         isApprovingTokens={isApprovingTokens}
         isContributing={isContributing}
+        memberContributions={memberContributions}
       />
       <Footer />
     </div>

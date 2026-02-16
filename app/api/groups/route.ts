@@ -4,7 +4,7 @@ import { getWalletGroups } from "@/lib/supabase/wallet-groups";
 import {
     STELLAR_CONFIG,
     getSorobanServer,
-    formatXlm
+    formatUsdc
 } from "@/lib/stellar-client";
 
 export async function GET(request: Request) {
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
                     id: id.toString(),
                     name: `Grupo #${id}`,
                     member_count: groupInfo.members.length,
-                    balance: `${formatXlm(totalStroops)} USDC`, // Usa tus 7 decimales
+                    balance: `${formatUsdc(totalStroops)} USDC`,
                     color: Number(id) % 2 === 0 ? "primary" : "secondary",
                 };
             } catch (err) {

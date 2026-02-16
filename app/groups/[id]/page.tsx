@@ -15,9 +15,12 @@ import {
   STELLAR_CONFIG,
   checkTreasuryExists,
   getGroupFundRounds,
+  getGroupMemberContributions,
 } from "@/lib/stellar-client"
+import type { MemberContributionInfo } from "@/lib/stellar-client"
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants"
 import { verifySessionToken } from "@/lib/auth/jwt"
+import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { GroupPageView } from "@/components/dashboard/group-page-view"
 import type { Group, FundRound } from "@/lib/stellar-client"
 
@@ -119,6 +122,8 @@ export default async function GroupPage({
         group={null}
         hasTreasury={false}
         fundRounds={[]}
+        totalBalance={BigInt(0)}
+        memberContributions={[]}
         status="invalid_id"
       />
     )
@@ -133,6 +138,8 @@ export default async function GroupPage({
         group={null}
         hasTreasury={false}
         fundRounds={[]}
+        totalBalance={BigInt(0)}
+        memberContributions={[]}
         status="not_found"
       />
     )
@@ -144,6 +151,42 @@ export default async function GroupPage({
     ? await getGroupFundRounds(groupId, publicKey)
     : []
 
+  const totalBalance = fundRounds.reduce(
+    (acc, r) => acc + r.fundedAmount,
+    BigInt(0)
+  )
+
+  let memberContributions: MemberContributionInfo[] =
+    hasTreasury && fundRounds.length > 0 && group.members.length > 0
+      ? await getGroupMemberContributions(
+          groupId,
+          publicKey,
+          group.members,
+          fundRounds.map((r) => r.id)
+        )
+      : []
+
+  if (memberContributions.length > 0 && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const supabase = getSupabaseAdmin()
+    const { data: rows } = await supabase
+      .from("wallet_profiles")
+      .select("wallet_address, display_name")
+      .in("wallet_address", memberContributions.map((m) => m.address))
+
+    const nameByAddress: Record<string, string> = {}
+    for (const row of rows ?? []) {
+      const name =
+        typeof row.display_name === "string" && row.display_name.trim()
+          ? row.display_name.trim()
+          : null
+      if (name) nameByAddress[row.wallet_address] = name
+    }
+    memberContributions = memberContributions.map((m) => ({
+      ...m,
+      name: nameByAddress[m.address],
+    }))
+  }
+
   return (
     <GroupPageView
       publicKey={publicKey}
@@ -151,6 +194,8 @@ export default async function GroupPage({
       group={group}
       hasTreasury={hasTreasury}
       fundRounds={fundRounds}
+      totalBalance={totalBalance}
+      memberContributions={memberContributions}
       status="ok"
     />
   )

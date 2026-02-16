@@ -64,15 +64,19 @@ const MOCK_PROPOSALS: ReleaseProposal[] = [
 
 // ─── Hook ───────────────────────────────────────────────────────
 
+/** Proposal with optional description for UI. */
+export type ReleaseProposalWithDescription = ReleaseProposal & { description?: string }
+
 interface UseLemipayReturn {
   group: Group | null
   fundRounds: FundRound[]
-  proposals: ReleaseProposal[]
+  proposals: ReleaseProposalWithDescription[]
   memberContributions: MemberContribution[] // Nueva data expuesta
   isLoading: boolean
   error: string | null
   totalBalance: bigint
   contribute: (roundIndex: number, amount: bigint) => Promise<void>
+  createProposal: (amountUsdc: number, destination: string, description?: string) => Promise<void>
   approveProposal: (proposalId: bigint) => Promise<void>
   executeRelease: (proposalId: bigint) => Promise<void>
   isSubmitting: boolean
@@ -88,7 +92,7 @@ const ADDRESS_TO_NAME: Record<string, string> = {
 export function useLemipay(userAddress: string | null): UseLemipayReturn {
   const [group, setGroup] = useState<Group | null>(null)
   const [fundRounds, setFundRounds] = useState<FundRound[]>([])
-  const [proposals, setProposals] = useState<ReleaseProposal[]>([])
+  const [proposals, setProposals] = useState<ReleaseProposalWithDescription[]>([])
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -185,6 +189,35 @@ export function useLemipay(userAddress: string | null): UseLemipayReturn {
     []
   )
 
+  const USDC_DECIMALS = 10_000_000
+
+  const createProposal = useCallback(
+    async (amountUsdc: number, destination: string, description?: string) => {
+      setIsSubmitting(true)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const amountRaw = BigInt(Math.round(amountUsdc * USDC_DECIMALS))
+      const nextId =
+        proposals.length === 0
+          ? BigInt(1)
+          : BigInt(
+              Math.max(...proposals.map((p) => Number(p.id)), 0) + 1
+            )
+      setProposals((prev) => [
+        ...prev,
+        {
+          id: nextId,
+          amount: amountRaw,
+          approvals: 0,
+          destination,
+          executed: false,
+          ...(description ? { description } : {}),
+        },
+      ])
+      setIsSubmitting(false)
+    },
+    [proposals.length]
+  )
+
   // Approve a release proposal
   const approveProposal = useCallback(async (proposalId: bigint) => {
     setIsSubmitting(true)
@@ -218,6 +251,7 @@ export function useLemipay(userAddress: string | null): UseLemipayReturn {
     error,
     totalBalance,
     contribute,
+    createProposal,
     approveProposal,
     executeRelease,
     isSubmitting,
