@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react";
 import {
     ArrowLeft,
     Users,
@@ -16,6 +17,9 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { MembersPanel } from "@/components/lemipay/v0/members-panel";
+import { ProposeFundRoundModal } from "@/components/modal/ProposeFundRoundModal";
+import { ContributeModal } from "@/components/modal/ContributeModal";
+import { formatXlm } from "@/lib/stellar-client";
 import { ContributionsPanel } from "./contributions-panel";
 
 export interface GroupDashboardContentProps {
@@ -23,13 +27,20 @@ export interface GroupDashboardContentProps {
     fundRounds: FundRound[]
     proposals: ReleaseProposal[]
     totalBalance: bigint
+    hasTreasury?: boolean
     isLoading: boolean
     address: string
     onBack: () => void
-    onContribute: (roundIndex: number, amount: bigint) => Promise<void>
+    onApproveTokens?: (amountUsdc: number) => Promise<void>
+    onContribute: (roundId: bigint, amountUsdc: number) => Promise<void>
     onApproveProposal: (proposalId: bigint) => Promise<void>
     onExecuteRelease: (proposalId: bigint) => Promise<void>
+    onCrearTreasury?: () => Promise<void>
+    onProposeFundRound?: (totalAmountUsdc: number) => Promise<void>
     isSubmitting: boolean
+    isProposingRound?: boolean
+    isApprovingTokens?: boolean
+    isContributing?: boolean
     memberContributions: { address: string; name?: string; totalAmount: bigint }[];
 }
 
@@ -38,15 +49,23 @@ export function GroupDashboardContent({
                                           fundRounds,
                                           proposals,
                                           totalBalance,
+                                          hasTreasury = true,
                                           isLoading,
                                           address,
                                           onBack,
+                                          onApproveTokens,
                                           onContribute,
                                           onApproveProposal,
                                           onExecuteRelease,
+                                          onCrearTreasury,
+                                          onProposeFundRound,
                                           isSubmitting,
-                                          memberContributions,
+                                          isProposingRound = false,
+                                          isApprovingTokens = false,
+                                          isContributing = false,
                                       }: GroupDashboardContentProps) {
+    const [proposeRoundModalOpen, setProposeRoundModalOpen] = useState(false);
+    const [contributeModalOpen, setContributeModalOpen] = useState(false);
 
     // Función auxiliar interna compatible con ES anteriores a 2020
     const safeBigInt = (val: any): bigint => {
@@ -66,14 +85,14 @@ export function GroupDashboardContent({
         );
     }
 
-    // Lógica de cálculo de progreso segura sin literales 'n'
-    const activeRound = fundRounds?.[0];
-    const totalAmount = safeBigInt(activeRound?.total_amount);
-    const fundedAmount = safeBigInt(activeRound?.funded_amount);
+    // Primera ronda no completada como activa, o la primera si todas están completadas
+    const activeRound = fundRounds?.find((r) => !r.completed) ?? fundRounds?.[0]
+    const totalAmount = activeRound ? safeBigInt(activeRound.totalAmount) : BigInt(0)
+    const fundedAmount = activeRound ? safeBigInt(activeRound.fundedAmount) : BigInt(0)
 
     const progressPercent = (activeRound && totalAmount > BigInt(0))
         ? Number((fundedAmount * BigInt(100)) / totalAmount)
-        : 0;
+        : 0
 
     return (
         <main className="container mx-auto max-w-4xl px-4 pt-10 pb-16">
@@ -85,22 +104,39 @@ export function GroupDashboardContent({
                 Mis Grupos
             </button>
 
-            {/* ─── 1. HERO BALANCE ─── */}
+            {/* ─── 1. HERO BALANCE o CREAR TESORERÍA ─── */}
             <section className="glass-card gradient-border mb-8 overflow-hidden p-1 animate-fade-up">
                 <div className="rounded-xl bg-background/60 p-8 text-center md:p-12">
                     <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         {group?.name || "Tesorería Grupal"}
                     </p>
-                    <p
-                        className="mt-4 font-display text-5xl font-bold text-primary sm:text-6xl md:text-7xl"
-                        style={{ textShadow: "0 0 30px hsla(var(--brand-lime), 0.35), 0 0 60px hsla(var(--brand-lime), 0.15)" }}
-                    >
-                        {totalBalance}
-                        <span className="ml-2 text-lg font-normal text-muted-foreground sm:text-xl">USDC</span>
-                    </p>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                        Quórum: <span className="font-semibold text-brand-purple">{group?.threshold || 2}</span> firmas requeridas
-                    </p>
+                    {hasTreasury ? (
+                        <>
+                            <p
+                                className="mt-4 font-display text-5xl font-bold text-primary sm:text-6xl md:text-7xl"
+                                style={{ textShadow: "0 0 30px hsla(var(--brand-lime), 0.35), 0 0 60px hsla(var(--brand-lime), 0.15)" }}
+                            >
+                                {totalBalance}
+                                <span className="ml-2 text-lg font-normal text-muted-foreground sm:text-xl">USDC</span>
+                            </p>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                Quórum: <span className="font-semibold text-brand-purple">{group?.threshold ?? 2}</span> firmas requeridas
+                            </p>
+                        </>
+                    ) : (
+                        <div className="mt-6">
+                            <Button
+                                disabled={isSubmitting}
+                                onClick={() => onCrearTreasury?.()}
+                                className="rounded-xl bg-primary px-8 py-3 font-bold text-primary-foreground hover:glow-lime"
+                            >
+                                CREAR TESORERÍA
+                            </Button>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                Este grupo aún no tiene tesorería. Créala para poder fondear y gestionar pagos.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </section>
 
@@ -186,30 +222,67 @@ export function GroupDashboardContent({
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Objetivo</p>
                                     <p className="mt-1 font-display text-2xl font-bold text-foreground">
-                                        {totalAmount.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">USDC</span>
+                                        {formatXlm(totalAmount)} <span className="text-sm font-normal text-muted-foreground">USDC</span>
                                     </p>
                                 </div>
                                 <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold text-primary animate-pulse">Activa</span>
                             </div>
                             <div className="mt-6">
                                 <div className="mb-2 flex items-end justify-between">
-                                    <span className="text-sm font-semibold text-primary">{fundedAmount.toLocaleString()} USDC</span>
+                                    <span className="text-sm font-semibold text-primary">{formatXlm(fundedAmount)} USDC</span>
                                     <span className="text-xs text-muted-foreground">{progressPercent}%</span>
                                 </div>
                                 <Progress value={progressPercent} className="h-3 bg-muted" />
                             </div>
                             <Button
-                                disabled={isSubmitting}
-                                onClick={() => onContribute(BigInt(50))}
+                                disabled={isContributing}
+                                onClick={() => setContributeModalOpen(true)}
                                 className="mt-6 w-full gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:glow-lime sm:w-auto sm:px-8 transition-all"
                             >
-                                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4" /> Aportar USDC</>}
+                                {isContributing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4" /> Aportar USDC</>}
                             </Button>
+                            {activeRound && onApproveTokens && (
+                                <ContributeModal
+                                    open={contributeModalOpen}
+                                    onOpenChange={setContributeModalOpen}
+                                    onApprove={onApproveTokens}
+                                    onContribute={(amountUsdc) => onContribute(activeRound.id, amountUsdc)}
+                                    isApproving={isApprovingTokens}
+                                    isContributing={isContributing}
+                                />
+                            )}
                         </div>
                     </div>
                 ) : (
-                    <div className="glass-card rounded-2xl p-8 text-center text-muted-foreground">
-                        No hay rondas de fondeo activas.
+                    <div className="glass-card rounded-2xl p-8 text-center">
+                        <p className="text-muted-foreground mb-4">
+                            No hay rondas de fondeo activas.
+                        </p>
+                        {onProposeFundRound ? (
+                            <>
+                                <Button
+                                    onClick={() => setProposeRoundModalOpen(true)}
+                                    disabled={isProposingRound}
+                                    className="rounded-xl bg-primary px-6 py-3 font-bold text-primary-foreground hover:glow-lime"
+                                >
+                                    {isProposingRound ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        "Crear ronda de fondeo"
+                                    )}
+                                </Button>
+                                <ProposeFundRoundModal
+                                    open={proposeRoundModalOpen}
+                                    onOpenChange={setProposeRoundModalOpen}
+                                    onPropose={onProposeFundRound}
+                                    isSubmitting={isProposingRound}
+                                />
+                            </>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                Creá una ronda para que el grupo pueda aportar fondos.
+                            </p>
+                        )}
                     </div>
                 )}
             </section>

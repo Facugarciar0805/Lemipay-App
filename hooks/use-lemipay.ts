@@ -14,6 +14,56 @@ export interface MemberContribution {
   totalAmount: bigint;
 }
 
+const MOCK_FUND_ROUNDS: FundRound[] = [
+  {
+    id: BigInt(1),
+    groupId: BigInt(1),
+    totalAmount: BigInt(50_000_000_0), // 500 USDC
+    fundedAmount: BigInt(32_500_000_0), // 325 USDC
+    completed: false,
+  },
+  {
+    id: BigInt(2),
+    groupId: BigInt(1),
+    totalAmount: BigInt(10_000_000_0), // 100 USDC
+    fundedAmount: BigInt(10_000_000_0), // 100 USDC
+    completed: true,
+  },
+  {
+    id: BigInt(3),
+    groupId: BigInt(1),
+    totalAmount: BigInt(20_000_000_0), // 200 USDC
+    fundedAmount: BigInt(8_000_000_0), // 80 USDC
+    completed: false,
+  },
+]
+
+const MOCK_PROPOSALS: ReleaseProposal[] = [
+  {
+    id: BigInt(1),
+    amount: BigInt(5_000_000_0), // 50 XLM
+    approvals: 1,
+    destination: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOBD3XCDKCP5HC6V",
+    executed: false,
+  },
+  {
+    id: BigInt(2),
+    amount: BigInt(12_000_000_0), // 120 XLM
+    approvals: 2,
+    destination: "GCFONE23AB7Y6C5YZOMKUKGETPIAJA752AHTQLNM7CVDXWG7NKBXSX5N",
+    executed: false,
+  },
+  {
+    id: BigInt(3),
+    amount: BigInt(3_000_000_0), // 30 XLM
+    approvals: 2,
+    destination: "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
+    executed: true,
+  },
+]
+
+// ─── Hook ───────────────────────────────────────────────────────
+
 interface UseLemipayReturn {
   group: Group | null
   fundRounds: FundRound[]
@@ -113,7 +163,51 @@ export function useLemipay(userAddress: string | null): UseLemipayReturn {
     fetchData();
   }, [userAddress])
 
-  // ... (funciones contribute, approveProposal, executeRelease se mantienen igual)
+  // Contribute to a fund round
+  const contribute = useCallback(
+    async (roundIndex: number, amount: bigint) => {
+      setIsSubmitting(true)
+      // Simulate Soroban transaction
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setFundRounds((prev) =>
+        prev.map((r, i) => {
+          if (i !== roundIndex) return r
+          const newFunded = r.fundedAmount + amount
+          return {
+            ...r,
+            fundedAmount: newFunded > r.totalAmount ? r.totalAmount : newFunded,
+            completed: newFunded >= r.totalAmount,
+          }
+        })
+      )
+      setIsSubmitting(false)
+    },
+    []
+  )
+
+  // Approve a release proposal
+  const approveProposal = useCallback(async (proposalId: bigint) => {
+    setIsSubmitting(true)
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    setProposals((prev) =>
+      prev.map((p) =>
+        p.id === proposalId ? { ...p, approvals: p.approvals + 1 } : p
+      )
+    )
+    setIsSubmitting(false)
+  }, [])
+
+  // Execute a release proposal
+  const executeRelease = useCallback(async (proposalId: bigint) => {
+    setIsSubmitting(true)
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    setProposals((prev) =>
+      prev.map((p) =>
+        p.id === proposalId ? { ...p, executed: true } : p
+      )
+    )
+    setIsSubmitting(false)
+  }, [])
 
   return {
     group,
@@ -123,9 +217,9 @@ export function useLemipay(userAddress: string | null): UseLemipayReturn {
     isLoading,
     error,
     totalBalance,
-    contribute: async (idx, amt) => { /* lógica existente */ },
-    approveProposal: async (id) => { /* lógica existente */ },
-    executeRelease: async (id) => { /* lógica existente */ },
+    contribute,
+    approveProposal,
+    executeRelease,
     isSubmitting,
   }
 }
