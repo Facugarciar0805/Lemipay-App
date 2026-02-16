@@ -32,6 +32,7 @@ interface ChallengeResponse {
 interface VerifyResponse {
   success: boolean;
   publicKey: string;
+  displayName?: string | null;
   error?: string;
 }
 
@@ -158,14 +159,10 @@ export default function LandingHome() {
         );
       }
 
-      // Cookie is set by verify response; check if profile already has display name
-      const profileRes = await fetch("/api/profile", { credentials: "include" });
-      const profileData = (await profileRes.json()) as {
-        displayName?: string | null;
-      };
+      // Use displayName from verify response (server already read from Supabase)
       const hasDisplayName =
-        typeof profileData.displayName === "string" &&
-        profileData.displayName.trim().length > 0;
+        typeof verifyData.displayName === "string" &&
+        verifyData.displayName.trim().length > 0;
 
       if (hasDisplayName) {
         router.replace("/dashboard");

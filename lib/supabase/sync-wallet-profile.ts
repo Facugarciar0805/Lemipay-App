@@ -77,6 +77,11 @@ export async function syncWalletProfile(
           "Supabase Auth admin requires the service_role key. In Supabase Dashboard go to Project Settings → API and use the 'service_role' secret (not the anon key). Set SUPABASE_SERVICE_ROLE_KEY in .env.",
         );
       }
+      if (msg.includes("Invalid API key")) {
+        throw new Error(
+          "SUPABASE_SERVICE_ROLE_KEY is invalid. In Supabase Dashboard → Project Settings → API copy the full 'service_role' secret again (no spaces, full length). If you regenerated keys, use the new secret.",
+        );
+      }
       throw new Error(`Supabase createUser: ${msg}`);
     }
   } else if (createData?.user?.id) {
@@ -85,14 +90,28 @@ export async function syncWalletProfile(
     throw new Error("Supabase createUser returned no user id.");
   }
 
-  // 2) Upsert wallet_profiles (one row per wallet_address)
+  // 2) Upsert wallet_profiles (one row per wallet_address).
+  // Only set display_name when we have a value; otherwise leave existing value (don't overwrite with null on login).
+  const payload: {
+    user_id: string;
+    wallet_address: string;
+    display_name?: string | null;
+    updated_at: string;
+  } = {
+    user_id: userId,
+    wallet_address: walletAddress,
+    updated_at: new Date().toISOString(),
+  };
+  const nameToSet =
+    displayName !== undefined && displayName !== null && String(displayName).trim() !== ""
+      ? String(displayName).trim()
+      : undefined;
+  if (nameToSet !== undefined) {
+    payload.display_name = nameToSet;
+  }
+
   const { error: upsertError } = await supabase.from("wallet_profiles").upsert(
-    {
-      user_id: userId,
-      wallet_address: walletAddress,
-      display_name: displayName ?? null,
-      updated_at: new Date().toISOString(),
-    },
+    payload,
     {
       onConflict: "wallet_address",
     },

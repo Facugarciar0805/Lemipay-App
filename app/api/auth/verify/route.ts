@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/constants";
 import { signSessionToken } from "@/lib/auth/jwt";
 import { syncWalletProfile } from "@/lib/supabase/sync-wallet-profile";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -145,7 +146,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const sessionToken = await signSessionToken(publicKey);
-    const response = NextResponse.json({ success: true, publicKey });
+
+    let displayNameFromProfile: string | null = null;
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data } = await supabase
+          .from("wallet_profiles")
+          .select("display_name")
+          .eq("wallet_address", publicKey)
+          .maybeSingle();
+        if (data?.display_name && typeof data.display_name === "string" && data.display_name.trim()) {
+          displayNameFromProfile = data.display_name.trim();
+        }
+      } catch {
+        // ignore; client will fall back to profile fetch
+      }
+    }
+
+    const response = NextResponse.json({
+      success: true,
+      publicKey,
+      displayName: displayNameFromProfile,
+    });
 
     response.cookies.set(AUTH_COOKIE_NAME, sessionToken, {
       httpOnly: true,
