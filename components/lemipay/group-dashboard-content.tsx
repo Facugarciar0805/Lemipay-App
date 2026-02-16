@@ -36,7 +36,7 @@ export interface GroupDashboardContentProps {
     onContribute: (roundId: bigint, amountUsdc: number) => Promise<void>
     onApproveProposal: (proposalId: bigint) => Promise<void>
     onExecuteRelease: (proposalId: bigint) => Promise<void>
-    onCreateProposal?: (params: { amountUsdc: number; destination: string; description?: string }) => Promise<void>
+    onCreateProposal?: (params: { amountUsdc: number; destination: string }) => Promise<void>
     onCrearTreasury?: () => Promise<void>
     onProposeFundRound?: (totalAmountUsdc: number) => Promise<void>
     isSubmitting: boolean

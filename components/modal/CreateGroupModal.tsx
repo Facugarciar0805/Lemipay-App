@@ -107,6 +107,16 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
       approvals_required: values.approvals_required,
     })
     if (result?.groupId) {
+      try {
+        await fetch("/api/wallet-groups", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId: result.groupId }),
+          credentials: "include",
+        })
+      } catch {
+        // Grupo ya creado on-chain; el listado en Supabase se puede corregir después
+      }
       handleClose(false)
       router.push(`/groups/${result.groupId}`)
     }

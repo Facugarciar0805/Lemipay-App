@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button"
 import Footer from "@/components/landing/Footer"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import type { Group, FundRound, MemberContributionInfo } from "@/lib/stellar-client"
+import type { Group, FundRound, MemberContributionInfo, ReleaseProposal } from "@/lib/stellar-client"
 import { useCreateTreasury } from "@/hooks/useCreateTreasury"
 import { useProposeFundRound } from "@/hooks/useProposeFundRound"
+import { useProposeRelease } from "@/hooks/useProposeRelease"
 import { useContributeToFundRound } from "@/hooks/useContributeToFundRound"
+import { useApproveRelease } from "@/hooks/useApproveRelease"
 
 export type GroupPageStatus = "ok" | "invalid_id" | "not_found"
 
@@ -23,6 +25,7 @@ export interface GroupPageViewProps {
   group: Group | null
   hasTreasury: boolean
   fundRounds: FundRound[]
+  proposals: ReleaseProposal[]
   totalBalance: bigint
   memberContributions: MemberContributionInfo[]
   status: GroupPageStatus
@@ -41,6 +44,7 @@ export function GroupPageView({
   group,
   hasTreasury,
   fundRounds,
+  proposals,
   totalBalance,
   memberContributions,
   status,
@@ -64,6 +68,13 @@ export function GroupPageView({
   } = useProposeFundRound()
 
   const {
+    proposeRelease,
+    isLoading: isProposingRelease,
+    error: proposeReleaseError,
+    reset: resetProposeRelease,
+  } = useProposeRelease()
+
+  const {
     approve: approveTokens,
     contribute: contributeToRound,
     isApproving: isApprovingTokens,
@@ -71,6 +82,13 @@ export function GroupPageView({
     error: contributeError,
     reset: resetContribute,
   } = useContributeToFundRound()
+
+  const {
+    approveRelease,
+    isLoading: isApprovingRelease,
+    error: approveReleaseError,
+    reset: resetApproveRelease,
+  } = useApproveRelease()
 
   const onCrearTreasury = useCallback(async () => {
     if (!groupId) return
@@ -135,15 +153,34 @@ export function GroupPageView({
     router.push("/dashboard")
   }, [router])
 
-  const noopApprove = useCallback(async () => {}, [])
   const noopExecute = useCallback(async () => {}, [])
 
-  const onCreateProposal = useCallback(
-    async (_params: { amountUsdc: number; destination: string; description?: string }) => {
-      // TODO: wire to useCreateReleaseProposal when available
-      router.refresh()
+  const onApproveProposal = useCallback(
+    async (proposalId: bigint) => {
+      const hash = await approveRelease(proposalId)
+      if (hash) {
+        resetApproveRelease()
+        router.refresh()
+      }
     },
-    [router]
+    [approveRelease, resetApproveRelease, router]
+  )
+
+  const onCreateProposal = useCallback(
+    async (params: { amountUsdc: number; destination: string }) => {
+      if (!groupId) return
+      const hash = await proposeRelease(
+        BigInt(groupId),
+        params.destination,
+        params.amountUsdc
+      )
+      if (hash) {
+        resetProposeRelease()
+        router.refresh()
+      }
+      // Si falla, el error se muestra en el banner (proposeReleaseError)
+    },
+    [groupId, proposeRelease, resetProposeRelease, router]
   )
 
   if (status === "invalid_id") {
@@ -247,10 +284,26 @@ export function GroupPageView({
           </div>
         </section>
       ) : null}
+      {proposeReleaseError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{proposeReleaseError.message}</p>
+          </div>
+        </section>
+      ) : null}
+      {approveReleaseError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{approveReleaseError.message}</p>
+          </div>
+        </section>
+      ) : null}
       <GroupDashboardContent
         group={group}
         fundRounds={fundRounds}
-        proposals={[]}
+        proposals={proposals}
         totalBalance={totalBalance}
         hasTreasury={hasTreasury}
         isLoading={false}
@@ -258,12 +311,12 @@ export function GroupPageView({
         onBack={onBack}
         onApproveTokens={onApproveTokens}
         onContribute={onContribute}
-        onApproveProposal={noopApprove}
+        onApproveProposal={onApproveProposal}
         onExecuteRelease={noopExecute}
         onCreateProposal={onCreateProposal}
         onCrearTreasury={onCrearTreasury}
         onProposeFundRound={onProposeFundRound}
-        isSubmitting={isCreatingTreasury}
+        isSubmitting={isCreatingTreasury || isProposingRelease || isApprovingRelease}
         isProposingRound={isProposingRound}
         isApprovingTokens={isApprovingTokens}
         isContributing={isContributing}

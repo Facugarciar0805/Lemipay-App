@@ -76,7 +76,7 @@ interface UseLemipayReturn {
   error: string | null
   totalBalance: bigint
   contribute: (roundIndex: number, amount: bigint) => Promise<void>
-  createProposal: (amountUsdc: number, destination: string, description?: string) => Promise<void>
+  createProposal: (amountUsdc: number, destination: string) => Promise<void>
   approveProposal: (proposalId: bigint) => Promise<void>
   executeRelease: (proposalId: bigint) => Promise<void>
   isSubmitting: boolean
@@ -192,7 +192,7 @@ export function useLemipay(userAddress: string | null): UseLemipayReturn {
   const USDC_DECIMALS = 10_000_000
 
   const createProposal = useCallback(
-    async (amountUsdc: number, destination: string, description?: string) => {
+    async (amountUsdc: number, destination: string) => {
       setIsSubmitting(true)
       await new Promise((resolve) => setTimeout(resolve, 1000))
       const amountRaw = BigInt(Math.round(amountUsdc * USDC_DECIMALS))
@@ -210,7 +210,6 @@ export function useLemipay(userAddress: string | null): UseLemipayReturn {
           approvals: 0,
           destination,
           executed: false,
-          ...(description ? { description } : {}),
         },
       ])
       setIsSubmitting(false)

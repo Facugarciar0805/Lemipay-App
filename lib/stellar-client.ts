@@ -298,6 +298,137 @@ export async function getUserContribution(
   }
 }
 
+/**
+ * Raw ReleaseProposal struct from the contract (get_release_proposal).
+ * Contract: amount (i128), approvals (u32), destination (address), executed (bool), group_id (u64)
+ */
+/** Contract returns struct as map; i128 amount can come as string (e.g. "20" or "200000000"). */
+interface ContractReleaseProposalStruct {
+  amount?: bigint | number | string
+  approvals?: number
+  destination?: string | { address?: string }
+  executed?: boolean
+  group_id?: bigint | number
+}
+
+/**
+ * Returns a single release proposal by ID (calls get_release_proposal on Treasury contract).
+ * The contract struct does not include id; we pass it through.
+ */
+export async function getReleaseProposal(
+  proposalId: bigint,
+  sourceAddress: string
+): Promise<ReleaseProposal | null> {
+  const server = getSorobanServer()
+  let account
+  try {
+    account = await server.getAccount(sourceAddress)
+  } catch {
+    return null
+  }
+  const contract = new Contract(TREASURY_CONTRACT_ID)
+  const invokeOp = contract.call(
+    "get_release_proposal",
+    nativeToScVal(proposalId, { type: "u64" })
+  )
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_CONFIG.networkPassphrase,
+  })
+    .addOperation(invokeOp)
+    .setTimeout(60)
+  const rawTx = builder.build()
+  let simulation: rpc.Api.SimulateTransactionResponse
+  try {
+    simulation = await server.simulateTransaction(rawTx)
+  } catch {
+    return null
+  }
+  if (rpc.Api.isSimulationError(simulation)) return null
+  const result = simulation.result
+  if (!result?.retval) return null
+  try {
+    const raw = scValToNative(result.retval) as ContractReleaseProposalStruct
+    if (!raw || typeof raw !== "object") return null
+    // i128 amount can be bigint, number, or string from SDK; use String to avoid precision loss
+    const amount =
+      typeof raw.amount === "bigint"
+        ? raw.amount
+        : BigInt(String(raw.amount ?? 0))
+    const approvals = typeof raw.approvals === "number" ? raw.approvals : 0
+    let destination = ""
+    const dest = raw.destination
+    if (typeof dest === "string") {
+      destination = dest
+    } else if (dest && typeof dest === "object" && "address" in dest) {
+      destination = String((dest as { address?: string }).address ?? "")
+    }
+    const executed = Boolean(raw.executed)
+    return {
+      id: proposalId,
+      amount,
+      approvals,
+      destination,
+      executed,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Returns the release proposals for a group.
+ * get_release_proposals_of_group returns vec<u64> (IDs); we fetch each with get_release_proposal.
+ */
+export async function getReleaseProposalsOfGroup(
+  groupId: bigint,
+  sourceAddress: string
+): Promise<ReleaseProposal[]> {
+  const server = getSorobanServer()
+  let account
+  try {
+    account = await server.getAccount(sourceAddress)
+  } catch {
+    return []
+  }
+  const contract = new Contract(TREASURY_CONTRACT_ID)
+  const invokeOp = contract.call(
+    "get_release_proposals_of_group",
+    nativeToScVal(groupId, { type: "u64" })
+  )
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_CONFIG.networkPassphrase,
+  })
+    .addOperation(invokeOp)
+    .setTimeout(60)
+  const rawTx = builder.build()
+  let simulation: rpc.Api.SimulateTransactionResponse
+  try {
+    simulation = await server.simulateTransaction(rawTx)
+  } catch {
+    return []
+  }
+  if (rpc.Api.isSimulationError(simulation)) return []
+  const result = simulation.result
+  if (!result?.retval) return []
+  let proposalIds: bigint[] = []
+  try {
+    const decoded = scValToNative(result.retval) as unknown
+    if (Array.isArray(decoded)) {
+      proposalIds = decoded.map((v) => BigInt(v))
+    }
+  } catch {
+    return []
+  }
+  const proposals: ReleaseProposal[] = []
+  for (const id of proposalIds) {
+    const p = await getReleaseProposal(id, sourceAddress)
+    if (p) proposals.push(p)
+  }
+  return proposals
+}
+
 /** Per-member contribution and balance for the contributions panel. */
 export interface MemberContributionInfo {
   address: string

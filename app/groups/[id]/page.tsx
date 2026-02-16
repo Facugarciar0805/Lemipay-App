@@ -16,8 +16,9 @@ import {
   checkTreasuryExists,
   getGroupFundRounds,
   getGroupMemberContributions,
+  getReleaseProposalsOfGroup,
 } from "@/lib/stellar-client"
-import type { MemberContributionInfo } from "@/lib/stellar-client"
+import type { MemberContributionInfo, ReleaseProposal } from "@/lib/stellar-client"
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants"
 import { verifySessionToken } from "@/lib/auth/jwt"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
@@ -122,6 +123,7 @@ export default async function GroupPage({
         group={null}
         hasTreasury={false}
         fundRounds={[]}
+        proposals={[]}
         totalBalance={BigInt(0)}
         memberContributions={[]}
         status="invalid_id"
@@ -138,6 +140,7 @@ export default async function GroupPage({
         group={null}
         hasTreasury={false}
         fundRounds={[]}
+        proposals={[]}
         totalBalance={BigInt(0)}
         memberContributions={[]}
         status="not_found"
@@ -149,6 +152,9 @@ export default async function GroupPage({
   const hasTreasury = await checkTreasuryExists(groupId, publicKey)
   const fundRounds: FundRound[] = hasTreasury
     ? await getGroupFundRounds(groupId, publicKey)
+    : []
+  const proposals: ReleaseProposal[] = hasTreasury
+    ? await getReleaseProposalsOfGroup(groupId, publicKey)
     : []
 
   const totalBalance = fundRounds.reduce(
@@ -194,6 +200,7 @@ export default async function GroupPage({
       group={group}
       hasTreasury={hasTreasury}
       fundRounds={fundRounds}
+      proposals={proposals}
       totalBalance={totalBalance}
       memberContributions={memberContributions}
       status="ok"

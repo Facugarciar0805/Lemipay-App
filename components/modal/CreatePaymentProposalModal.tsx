@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Loader2 } from "lucide-react"
 
 const STELLAR_ADDRESS_REGEX = /^[GC][A-Z2-7]{55}$/
@@ -20,7 +19,7 @@ const STELLAR_ADDRESS_REGEX = /^[GC][A-Z2-7]{55}$/
 export interface CreatePaymentProposalModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (params: { amountUsdc: number; destination: string; description?: string }) => Promise<void>
+  onSubmit: (params: { amountUsdc: number; destination: string }) => Promise<void>
   isSubmitting?: boolean
 }
 
@@ -32,7 +31,6 @@ export function CreatePaymentProposalModal({
 }: CreatePaymentProposalModalProps) {
   const [amount, setAmount] = useState("")
   const [destination, setDestination] = useState("")
-  const [description, setDescription] = useState("")
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,14 +47,9 @@ export function CreatePaymentProposalModal({
       return
     }
     try {
-      await onSubmit({
-        amountUsdc: amountNum,
-        destination: dest,
-        description: description.trim() || undefined,
-      })
+      await onSubmit({ amountUsdc: amountNum, destination: dest })
       setAmount("")
       setDestination("")
-      setDescription("")
       onOpenChange(false)
     } catch {
       setError("No se pudo crear la propuesta. Intentá de nuevo.")
@@ -97,18 +90,6 @@ export function CreatePaymentProposalModal({
                 onChange={(e) => setDestination(e.target.value)}
                 disabled={isSubmitting}
                 className="font-mono text-sm"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="payment-description">Descripción (opcional)</Label>
-              <Textarea
-                id="payment-description"
-                placeholder="Ej: Reembolso gastos viaje"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isSubmitting}
-                rows={2}
-                className="resize-none"
               />
             </div>
             {error && (

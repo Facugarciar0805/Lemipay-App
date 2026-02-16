@@ -29,8 +29,8 @@ export function GroupDashboard({ address, onBack }: GroupDashboardProps) {
   const onApproveTokens = useCallback(async () => {}, [])
 
   const onCreateProposal = useCallback(
-    async (params: { amountUsdc: number; destination: string; description?: string }) => {
-      await createProposal(params.amountUsdc, params.destination, params.description)
+    async (params: { amountUsdc: number; destination: string }) => {
+      await createProposal(params.amountUsdc, params.destination)
     },
     [createProposal]
   )
