@@ -21,21 +21,24 @@ const MOCK_GROUP: Group = {
 
 const MOCK_FUND_ROUNDS: FundRound[] = [
   {
+    id: BigInt(1),
     groupId: BigInt(1),
-    totalAmount: BigInt(50_000_000_0), // 500 XLM
-    fundedAmount: BigInt(32_500_000_0), // 325 XLM
+    totalAmount: BigInt(50_000_000_0), // 500 USDC
+    fundedAmount: BigInt(32_500_000_0), // 325 USDC
     completed: false,
   },
   {
+    id: BigInt(2),
     groupId: BigInt(1),
-    totalAmount: BigInt(10_000_000_0), // 100 XLM
-    fundedAmount: BigInt(10_000_000_0), // 100 XLM
+    totalAmount: BigInt(10_000_000_0), // 100 USDC
+    fundedAmount: BigInt(10_000_000_0), // 100 USDC
     completed: true,
   },
   {
+    id: BigInt(3),
     groupId: BigInt(1),
-    totalAmount: BigInt(20_000_000_0), // 200 XLM
-    fundedAmount: BigInt(8_000_000_0), // 80 XLM
+    totalAmount: BigInt(20_000_000_0), // 200 USDC
+    fundedAmount: BigInt(8_000_000_0), // 80 USDC
     completed: false,
   },
 ]

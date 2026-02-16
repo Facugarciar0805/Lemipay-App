@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button"
 import Footer from "@/components/landing/Footer"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import type { Group } from "@/lib/stellar-client"
+import type { Group, FundRound } from "@/lib/stellar-client"
 import { useCreateTreasury } from "@/hooks/useCreateTreasury"
+import { useProposeFundRound } from "@/hooks/useProposeFundRound"
+import { useContributeToFundRound } from "@/hooks/useContributeToFundRound"
 
 export type GroupPageStatus = "ok" | "invalid_id" | "not_found"
 
@@ -20,6 +22,7 @@ export interface GroupPageViewProps {
   groupId: string
   group: Group | null
   hasTreasury: boolean
+  fundRounds: FundRound[]
   status: GroupPageStatus
 }
 
@@ -35,6 +38,7 @@ export function GroupPageView({
   groupId,
   group,
   hasTreasury,
+  fundRounds,
   status,
 }: GroupPageViewProps) {
   const router = useRouter()
@@ -48,6 +52,22 @@ export function GroupPageView({
     reset: resetCreateTreasury,
   } = useCreateTreasury()
 
+  const {
+    proposeFundRound,
+    isLoading: isProposingRound,
+    error: proposeFundRoundError,
+    reset: resetProposeFundRound,
+  } = useProposeFundRound()
+
+  const {
+    approve: approveTokens,
+    contribute: contributeToRound,
+    isApproving: isApprovingTokens,
+    isContributing,
+    error: contributeError,
+    reset: resetContribute,
+  } = useContributeToFundRound()
+
   const onCrearTreasury = useCallback(async () => {
     if (!groupId) return
     const groupIdBigInt = BigInt(groupId)
@@ -57,6 +77,41 @@ export function GroupPageView({
       router.refresh()
     }
   }, [groupId, createTreasury, resetCreateTreasury, router])
+
+  const onProposeFundRound = useCallback(
+    async (totalAmountUsdc: number) => {
+      if (!groupId) return
+      const hash = await proposeFundRound(BigInt(groupId), totalAmountUsdc)
+      if (hash) {
+        resetProposeFundRound()
+        router.refresh()
+      } else {
+        throw new Error("No se pudo crear la ronda. Revisá el mensaje de error arriba.")
+      }
+    },
+    [groupId, proposeFundRound, resetProposeFundRound, router]
+  )
+
+  const onApproveTokens = useCallback(
+    async (amountUsdc: number) => {
+      const hash = await approveTokens(amountUsdc)
+      if (!hash) throw new Error("No se pudo dar permiso. Revisá el mensaje de error arriba.")
+    },
+    [approveTokens]
+  )
+
+  const onContribute = useCallback(
+    async (roundId: bigint, amountUsdc: number) => {
+      const hash = await contributeToRound(roundId, amountUsdc)
+      if (hash) {
+        resetContribute()
+        router.refresh()
+      } else {
+        throw new Error("No se pudo aportar. Revisá el mensaje de error arriba.")
+      }
+    },
+    [contributeToRound, resetContribute, router]
+  )
 
   const onLogout = useCallback(async () => {
     if (isLoggingOut) return
@@ -76,7 +131,6 @@ export function GroupPageView({
     router.push("/dashboard")
   }, [router])
 
-  const noopContribute = useCallback(async () => {}, [])
   const noopApprove = useCallback(async () => {}, [])
   const noopExecute = useCallback(async () => {}, [])
 
@@ -165,20 +219,41 @@ export function GroupPageView({
           </div>
         </section>
       ) : null}
+      {proposeFundRoundError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{proposeFundRoundError.message}</p>
+          </div>
+        </section>
+      ) : null}
+      {contributeError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{contributeError.message}</p>
+          </div>
+        </section>
+      ) : null}
       <GroupDashboardContent
         group={group}
-        fundRounds={[]}
+        fundRounds={fundRounds}
         proposals={[]}
         totalBalance={BigInt(0)}
         hasTreasury={hasTreasury}
         isLoading={false}
         address={publicKey}
         onBack={onBack}
-        onContribute={noopContribute}
+        onApproveTokens={onApproveTokens}
+        onContribute={onContribute}
         onApproveProposal={noopApprove}
         onExecuteRelease={noopExecute}
         onCrearTreasury={onCrearTreasury}
+        onProposeFundRound={onProposeFundRound}
         isSubmitting={isCreatingTreasury}
+        isProposingRound={isProposingRound}
+        isApprovingTokens={isApprovingTokens}
+        isContributing={isContributing}
       />
       <Footer />
     </div>

@@ -14,11 +14,12 @@ import {
   CREATE_GROUP_CONTRACT_ID,
   STELLAR_CONFIG,
   checkTreasuryExists,
+  getGroupFundRounds,
 } from "@/lib/stellar-client"
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants"
 import { verifySessionToken } from "@/lib/auth/jwt"
 import { GroupPageView } from "@/components/dashboard/group-page-view"
-import type { Group } from "@/lib/stellar-client"
+import type { Group, FundRound } from "@/lib/stellar-client"
 
 export interface SorobanGroup {
   members: string[]
@@ -117,6 +118,7 @@ export default async function GroupPage({
         groupId={id ?? ""}
         group={null}
         hasTreasury={false}
+        fundRounds={[]}
         status="invalid_id"
       />
     )
@@ -130,6 +132,7 @@ export default async function GroupPage({
         groupId={String(groupId)}
         group={null}
         hasTreasury={false}
+        fundRounds={[]}
         status="not_found"
       />
     )
@@ -137,6 +140,9 @@ export default async function GroupPage({
 
   const group: Group = toGroup(groupId, sorobanGroup)
   const hasTreasury = await checkTreasuryExists(groupId, publicKey)
+  const fundRounds: FundRound[] = hasTreasury
+    ? await getGroupFundRounds(groupId, publicKey)
+    : []
 
   return (
     <GroupPageView
@@ -144,6 +150,7 @@ export default async function GroupPage({
       groupId={String(groupId)}
       group={group}
       hasTreasury={hasTreasury}
+      fundRounds={fundRounds}
       status="ok"
     />
   )
