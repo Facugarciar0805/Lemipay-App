@@ -35,7 +35,7 @@ export function GroupCard({ group, totalBalance, isLoading }: GroupCardProps) {
         <div className="flex flex-col gap-4">
           <div>
             <p className="text-3xl font-bold font-mono tracking-tight text-foreground">
-              {formatXlm(totalBalance)} <span className="text-lg text-muted-foreground font-normal">XLM</span>
+              {formatXlm(totalBalance)} <span className="text-lg text-muted-foreground font-normal">USDC</span>
             </p>
           </div>
           <div className="flex items-center gap-3">
