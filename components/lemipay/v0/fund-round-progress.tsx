@@ -40,7 +40,7 @@ export function FundRoundProgress({
 
   const handleContribute = async (index: number) => {
     setContributingIndex(index)
-    // Contribute 10 XLM as a demo amount
+    // Contribute 10 USDC as a demo amount
     await onContribute(index, xlmToStroops(10))
     setContributingIndex(null)
   }
@@ -92,7 +92,7 @@ export function FundRoundProgress({
                   )}
                 </div>
                 <span className="text-xs font-mono text-muted-foreground">
-                  {formatXlm(round.fundedAmount)}/{formatXlm(round.totalAmount)} XLM
+                  {formatXlm(round.fundedAmount)}/{formatXlm(round.totalAmount)} USDC
                 </span>
               </div>
 
@@ -118,7 +118,7 @@ export function FundRoundProgress({
                     ) : (
                       <>
                         <TrendingUp className="h-3 w-3 mr-1" />
-                        Aportar 10 XLM
+                        Aportar 10 USDC
                       </>
                     )}
                   </Button>

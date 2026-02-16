@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Group } from "@/lib/stellar-client"
@@ -11,13 +12,41 @@ interface MembersPanelProps {
     currentAddress?: string | null
 }
 
-const MEMBER_NAMES = ["Santiago M.", "María L.", "Carlos R.", "Ana G.", "Diego P."]
+function getInitials(displayName: string | null): string {
+    if (!displayName || displayName === "unknown") return "?"
+    const parts = displayName.trim().split(/\s+/)
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase().slice(0, 2)
+    }
+    return displayName.trim().slice(0, 2).toUpperCase() || "?"
+}
 
 export function MembersPanel({
                                  group,
                                  isLoading,
                                  currentAddress = null,
                              }: MembersPanelProps) {
+    const [namesByAddress, setNamesByAddress] = useState<Record<string, string | null>>({})
+
+    useEffect(() => {
+        if (!group?.members?.length) {
+            setNamesByAddress({})
+            return
+        }
+        const wallets = group.members.filter(Boolean).join(",")
+        if (!wallets) return
+        let cancelled = false
+        fetch(`/api/profiles?wallets=${encodeURIComponent(wallets)}`)
+            .then((res) => res.json())
+            .then((data: { profiles?: Record<string, string | null> }) => {
+                if (!cancelled && data.profiles) setNamesByAddress(data.profiles)
+            })
+            .catch(() => {
+                if (!cancelled) setNamesByAddress({})
+            })
+        return () => { cancelled = true }
+    }, [group?.members?.join(",")])
+
     if (isLoading) {
         return <MembersSkeleton />
     }
@@ -35,8 +64,9 @@ export function MembersPanel({
                     ? `${member.slice(0, 4)}...${member.slice(-4)}`
                     : "G...X4kQ";
 
-                const name = MEMBER_NAMES[i] || `Miembro ${i + 1}`;
-                const initials = name.split(" ").map(n => n[0]).join("");
+                const displayName = namesByAddress[member] ?? null
+                const name = displayName && displayName.trim() ? displayName.trim() : "unknown"
+                const initials = getInitials(name === "unknown" ? null : name)
 
                 return (
                     <div

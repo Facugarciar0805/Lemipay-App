@@ -1,8 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Loader2, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DashboardNavbarProps {
   publicKey: string;
@@ -19,6 +26,24 @@ export function DashboardNavbar({
   onLogout,
   isLoggingOut,
 }: DashboardNavbarProps) {
+  const [displayName, setDisplayName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/profile", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data: { displayName?: string | null }) => {
+        if (!cancelled && typeof data.displayName === "string" && data.displayName.trim()) {
+          setDisplayName(data.displayName.trim());
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true };
+  }, []);
+
+  const label = displayName ? "Conectado como" : "Wallet";
+  const mainText = displayName ?? getShortAddress(publicKey);
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/30 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
@@ -42,12 +67,21 @@ export function DashboardNavbar({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden rounded-lg border border-border/40 bg-muted/30 px-3 py-1.5 md:block">
-            <p className="text-[11px] text-muted-foreground">Wallet con la que te conectaste</p>
-            <p className="font-mono text-xs text-foreground">
-              {getShortAddress(publicKey)}
-            </p>
-          </div>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="hidden rounded-lg border border-border/40 bg-muted/30 px-3 py-1.5 md:block cursor-default">
+                  <p className="text-[11px] text-muted-foreground">{label}</p>
+                  <p className="font-semibold text-sm text-foreground truncate max-w-[180px]">
+                    {mainText}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[320px] font-mono text-xs break-all">
+                {publicKey}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             variant="outline"
             size="sm"

@@ -93,7 +93,7 @@ export function GroupDashboardContent({
                         style={{ textShadow: "0 0 30px hsla(var(--brand-lime), 0.35), 0 0 60px hsla(var(--brand-lime), 0.15)" }}
                     >
                         {totalBalance}
-                        <span className="ml-2 text-lg font-normal text-muted-foreground sm:text-xl">XLM</span>
+                        <span className="ml-2 text-lg font-normal text-muted-foreground sm:text-xl">USDC</span>
                     </p>
                     <p className="mt-3 text-xs text-muted-foreground">
                         Quórum: <span className="font-semibold text-brand-purple">{group?.threshold || 2}</span> firmas requeridas
@@ -136,7 +136,7 @@ export function GroupDashboardContent({
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-foreground">{p.description}</p>
                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                Monto: <span className="font-semibold text-primary">{p.amount} XLM</span>
+                                                Monto: <span className="font-semibold text-primary">{p.amount} USDC</span>
                                             </p>
                                             <div className="mt-2 flex items-center gap-2">
                                <span className="text-[11px] text-muted-foreground">
@@ -183,14 +183,14 @@ export function GroupDashboardContent({
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Objetivo</p>
                                     <p className="mt-1 font-display text-2xl font-bold text-foreground">
-                                        {totalAmount.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">XLM</span>
+                                        {totalAmount.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">USDC</span>
                                     </p>
                                 </div>
                                 <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold text-primary animate-pulse">Activa</span>
                             </div>
                             <div className="mt-6">
                                 <div className="mb-2 flex items-end justify-between">
-                                    <span className="text-sm font-semibold text-primary">{fundedAmount.toLocaleString()} XLM</span>
+                                    <span className="text-sm font-semibold text-primary">{fundedAmount.toLocaleString()} USDC</span>
                                     <span className="text-xs text-muted-foreground">{progressPercent}%</span>
                                 </div>
                                 <Progress value={progressPercent} className="h-3 bg-muted" />
@@ -200,7 +200,7 @@ export function GroupDashboardContent({
                                 onClick={() => onContribute(BigInt(50))}
                                 className="mt-6 w-full gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:glow-lime sm:w-auto sm:px-8 transition-all"
                             >
-                                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4" /> Aportar XLM</>}
+                                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4" /> Aportar USDC</>}
                             </Button>
                         </div>
                     </div>

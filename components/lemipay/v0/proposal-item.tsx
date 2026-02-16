@@ -130,7 +130,7 @@ export function ProposalList({
                   <span className="text-lg font-mono font-bold text-foreground">
                     {formatXlm(proposal.amount)}{" "}
                     <span className="text-sm text-muted-foreground font-normal">
-                      XLM
+                      USDC
                     </span>
                   </span>
                 </div>
