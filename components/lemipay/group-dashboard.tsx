@@ -11,6 +11,7 @@ interface GroupDashboardProps {
   onBack: () => void
 }
 
+
 export function GroupDashboard({ address, onBack }: GroupDashboardProps) {
   const {
     group,
