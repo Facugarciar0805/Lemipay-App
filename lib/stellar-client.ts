@@ -17,7 +17,7 @@ export const STELLAR_CONFIG = {
   sorobanUrl: "https://soroban-testnet.stellar.org",
   contracts: {
     groups: "CABYTW7GMOYRDOEYUTFQOFTYGPEFUZOOGYDIJLSYLDP7XFWQ4A2TFXP2",
-    treasury: "CCCRRA4DSWP6UAJTF5XNK7VLD3TASQA3D274WBN5F3RDXLNI4DHJM7IZ",
+    treasury: "CB2NG4BAHP3ZA2QPLLBPWMI6O27VRGK22GSUJAWHTDPDSNXCBPXPVJ24",
     /** USDC token (testnet). Override with NEXT_PUBLIC_USDC_CONTRACT_ID if different. */
     usdc: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
   },
@@ -27,9 +27,11 @@ export const STELLAR_CONFIG = {
 export const CREATE_GROUP_CONTRACT_ID =
   process.env.NEXT_PUBLIC_CREATE_GROUP_CONTRACT_ID ?? STELLAR_CONFIG.contracts.groups
 
-/** Treasury contract ID. Override with NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID. */
+/** Treasury contract ID. Override with NEXT_PUBLIC_NEW_CREATE_TREASURY_CONTRACT_ID or fallback to NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID. */
 export const TREASURY_CONTRACT_ID =
-  process.env.NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID ?? STELLAR_CONFIG.contracts.treasury
+  process.env.NEXT_PUBLIC_NEW_CREATE_TREASURY_CONTRACT_ID ??
+  process.env.NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID ??
+  STELLAR_CONFIG.contracts.treasury
 
 /** USDC token contract ID. Override with NEXT_PUBLIC_USDC_CONTRACT_ID. */
 export const USDC_CONTRACT_ID =
@@ -503,3 +505,94 @@ export interface UserContribution {
   address: string
   amount: bigint
 }
+
+/**
+ * Returns the total balance of a group's treasury (calls get_group_balance on Treasury contract).
+ */
+export async function getGroupBalance(
+  groupId: bigint,
+  sourceAddress: string
+): Promise<bigint> {
+  const server = getSorobanServer()
+  let account
+  try {
+    account = await server.getAccount(sourceAddress)
+  } catch {
+    return BigInt(0)
+  }
+  const contract = new Contract(TREASURY_CONTRACT_ID)
+  const invokeOp = contract.call(
+    "get_group_balance",
+    nativeToScVal(groupId, { type: "u64" })
+  )
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_CONFIG.networkPassphrase,
+  })
+    .addOperation(invokeOp)
+    .setTimeout(60)
+  const rawTx = builder.build()
+  let simulation: rpc.Api.SimulateTransactionResponse
+  try {
+    simulation = await server.simulateTransaction(rawTx)
+  } catch {
+    return BigInt(0)
+  }
+  if (rpc.Api.isSimulationError(simulation)) return BigInt(0)
+  const result = simulation.result
+  if (!result?.retval) return BigInt(0)
+  try {
+    const decoded = scValToNative(result.retval) as bigint
+    return typeof decoded === "bigint" ? decoded : BigInt(0)
+  } catch {
+    return BigInt(0)
+  }
+}
+
+/**
+ * Checks if a group has sufficient balance for a given amount (calls has_sufficient_group_balance on Treasury contract).
+ */
+export async function hasSufficientGroupBalance(
+  groupId: bigint,
+  amount: bigint,
+  sourceAddress: string
+): Promise<boolean> {
+  const server = getSorobanServer()
+  let account
+  try {
+    account = await server.getAccount(sourceAddress)
+  } catch {
+    return false
+  }
+  const contract = new Contract(TREASURY_CONTRACT_ID)
+  const invokeOp = contract.call(
+    "has_sufficient_group_balance",
+    nativeToScVal(groupId, { type: "u64" }),
+    nativeToScVal(amount, { type: "i128" })
+  )
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_CONFIG.networkPassphrase,
+  })
+    .addOperation(invokeOp)
+    .setTimeout(60)
+  const rawTx = builder.build()
+  let simulation: rpc.Api.SimulateTransactionResponse
+  try {
+    simulation = await server.simulateTransaction(rawTx)
+  } catch {
+    return false
+  }
+  if (rpc.Api.isSimulationError(simulation)) return false
+  const result = simulation.result
+  if (!result?.retval) return false
+  try {
+    const decoded = scValToNative(result.retval) as boolean
+    return decoded === true
+  } catch {
+    return false
+  }
+}
+
+// ─── Types ──────────────────────────────────────────────────────
+
