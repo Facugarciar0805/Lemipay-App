@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Award, ArrowUpRight, ArrowDownLeft, Info, Loader2 } from "lucide-react";
+import { Award, ArrowUpRight, ArrowDownLeft, Info, Loader2, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatUsdc } from "@/lib/stellar-client";
+import { WithdrawContributionModal } from "@/components/modal/WithdrawContributionModal";
 
 const USDC_DECIMALS = 10_000_000;
 
@@ -39,17 +41,28 @@ export interface ContributionItem {
 export function ContributionsPanel({
   contributions = [],
   isLoading = false,
+  currentUserAddress,
+  activeRoundId,
+  onWithdraw,
+  isWithdrawing = false,
 }: {
   contributions?: ContributionItem[];
   isLoading?: boolean;
+  currentUserAddress?: string;
+  activeRoundId?: bigint;
+  onWithdraw?: (roundId: bigint) => Promise<void>;
+  isWithdrawing?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<"aportes" | "saldos">("aportes");
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const withBalance = withBalances(contributions);
 
   const sortedAportes = [...withBalance].sort((a, b) =>
     a.totalAmount > b.totalAmount ? -1 : a.totalAmount < b.totalAmount ? 1 : 0
   );
   const sortedSaldos = [...withBalance].sort((a, b) => b.balance - a.balance);
+
+  const isCurrentUser = contributions.some((c) => c.address === currentUserAddress);
 
     return (
         <section className="mt-8 animate-fade-up">
@@ -92,6 +105,16 @@ export function ContributionsPanel({
                         </p>
                     </div>
 
+                    {onWithdraw && activeRoundId && isCurrentUser && (
+                        <WithdrawContributionModal
+                            open={withdrawModalOpen}
+                            onOpenChange={setWithdrawModalOpen}
+                            onWithdraw={() => onWithdraw(activeRoundId)}
+                            isSubmitting={isWithdrawing}
+                            roundId={activeRoundId}
+                        />
+                    )}
+
                     <div className="space-y-3">
                         {isLoading ? (
                             <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
@@ -109,6 +132,7 @@ export function ContributionsPanel({
                                 const isPositive = (member.balance ?? 0) > 0;
                                 const displayName = member.name ?? shortAddress(member.address);
                                 const initial = displayName[0]?.toUpperCase() ?? "?";
+                                const isCurrentUserMember = member.address === currentUserAddress;
 
                                 return (
                                     <div
@@ -136,25 +160,46 @@ export function ContributionsPanel({
                                             </div>
                                         </div>
 
-                                        <div className="text-right">
-                                            {activeTab === "aportes" ? (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="font-display text-lg font-bold text-primary">
-                                                        {formatUsdc(member.totalAmount)}{" "}
-                                                        <span className="text-[10px] text-muted-foreground">USDC</span>
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-end">
-                                                    <div className={`flex items-center gap-1 font-display text-lg font-bold ${isPositive ? "text-primary" : "text-brand-purple"}`}>
-                                                        {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
-                                                        {Math.abs(member.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                        <span className="text-[10px] opacity-70">USDC</span>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-right">
+                                                {activeTab === "aportes" ? (
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="font-display text-lg font-bold text-primary">
+                                                            {formatUsdc(member.totalAmount)}{" "}
+                                                            <span className="text-[10px] text-muted-foreground">USDC</span>
+                                                        </span>
                                                     </div>
-                                                    <p className={`text-[10px] font-medium ${isPositive ? "text-primary/70" : "text-brand-purple/70"}`}>
-                                                        {isPositive ? "a favor" : "debe aportar"}
-                                                    </p>
-                                                </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-end">
+                                                        <div className={`flex items-center gap-1 font-display text-lg font-bold ${isPositive ? "text-primary" : "text-brand-purple"}`}>
+                                                            {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+                                                            {Math.abs(member.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                            <span className="text-[10px] opacity-70">USDC</span>
+                                                        </div>
+                                                        <p className={`text-[10px] font-medium ${isPositive ? "text-primary/70" : "text-brand-purple/70"}`}>
+                                                            {isPositive ? "a favor" : "debe aportar"}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {onWithdraw && activeRoundId && isCurrentUserMember && activeTab === "aportes" && (
+                                                <Button
+                                                    onClick={() => setWithdrawModalOpen(true)}
+                                                    disabled={isWithdrawing}
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="gap-1.5 rounded-lg px-2 text-xs hover:bg-destructive/10 hover:text-destructive"
+                                                    title="Retirar aporte de esta ronda"
+                                                >
+                                                    {isWithdrawing ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <>
+                                                            <LogOut className="h-3.5 w-3.5" />
+                                                            <span className="hidden sm:inline">Retirar</span>
+                                                        </>
+                                                    )}
+                                                </Button>
                                             )}
                                         </div>
                                     </div>

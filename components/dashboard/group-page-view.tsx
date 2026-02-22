@@ -17,6 +17,8 @@ import { useProposeRelease } from "@/hooks/useProposeRelease"
 import { useContributeToFundRound } from "@/hooks/useContributeToFundRound"
 import { useApproveRelease } from "@/hooks/useApproveRelease"
 import { useExecuteRelease } from "@/hooks/useExecuteRelease"
+import { useWithdrawContribution } from "@/hooks/useWithdrawContribution"
+import { useCancelReleaseProposal } from "@/hooks/useCancelReleaseProposal"
 
 export type GroupPageStatus = "ok" | "invalid_id" | "not_found"
 
@@ -97,6 +99,20 @@ export function GroupPageView({
     error: executeReleaseError,
     reset: resetExecuteRelease,
   } = useExecuteRelease()
+
+  const {
+    withdrawContribution,
+    isLoading: isWithdrawing,
+    error: withdrawError,
+    reset: resetWithdraw,
+  } = useWithdrawContribution()
+
+  const {
+    cancelReleaseProposal,
+    isLoading: isCancelingRelease,
+    error: cancelReleaseError,
+    reset: resetCancelRelease,
+  } = useCancelReleaseProposal()
 
   const onCrearTreasury = useCallback(async () => {
     if (!groupId) return
@@ -198,6 +214,32 @@ export function GroupPageView({
       // Si falla, el error se muestra en el banner (proposeReleaseError)
     },
     [groupId, proposeRelease, resetProposeRelease, router]
+  )
+
+  const onWithdrawContribution = useCallback(
+    async (roundId: bigint) => {
+      const hash = await withdrawContribution(roundId)
+      if (hash) {
+        resetWithdraw()
+        router.refresh()
+      } else {
+        throw new Error("No se pudo retirar el aporte. Revisá el mensaje de error arriba.")
+      }
+    },
+    [withdrawContribution, resetWithdraw, router]
+  )
+
+  const onCancelReleaseProposal = useCallback(
+    async (proposalId: bigint) => {
+      const hash = await cancelReleaseProposal(proposalId)
+      if (hash) {
+        resetCancelRelease()
+        router.refresh()
+      } else {
+        throw new Error("No se pudo cancelar la propuesta. Revisá el mensaje de error arriba.")
+      }
+    },
+    [cancelReleaseProposal, resetCancelRelease, router]
   )
 
   if (status === "invalid_id") {
@@ -325,6 +367,22 @@ export function GroupPageView({
           </div>
         </section>
       ) : null}
+      {withdrawError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{withdrawError.message}</p>
+          </div>
+        </section>
+      ) : null}
+      {cancelReleaseError ? (
+        <section className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{cancelReleaseError.message}</p>
+          </div>
+        </section>
+      ) : null}
       <GroupDashboardContent
         group={group}
         fundRounds={fundRounds}
@@ -341,10 +399,14 @@ export function GroupPageView({
         onCreateProposal={onCreateProposal}
         onCrearTreasury={onCrearTreasury}
         onProposeFundRound={onProposeFundRound}
-        isSubmitting={isCreatingTreasury || isProposingRelease || isApprovingRelease || isExecutingRelease}
+        onWithdrawContribution={onWithdrawContribution}
+        onCancelReleaseProposal={onCancelReleaseProposal}
+        isSubmitting={isCreatingTreasury || isProposingRelease || isApprovingRelease || isExecutingRelease || isWithdrawing || isCancelingRelease}
         isProposingRound={isProposingRound}
         isApprovingTokens={isApprovingTokens}
         isContributing={isContributing}
+        isWithdrawing={isWithdrawing}
+        isCancelingRelease={isCancelingRelease}
         memberContributions={memberContributions}
       />
       <Footer />
