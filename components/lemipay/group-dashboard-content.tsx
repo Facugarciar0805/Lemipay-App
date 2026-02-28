@@ -3,24 +3,20 @@
 import { useState } from "react";
 import {
     ArrowLeft,
-    Users,
-    Crown,
-    User,
     Check,
-    Clock,
-    Target,
     Plus,
     Wallet,
     Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { MembersPanel } from "@/components/lemipay/v0/members-panel";
 import { ProposeFundRoundModal } from "@/components/modal/ProposeFundRoundModal";
 import { ContributeModal } from "@/components/modal/ContributeModal";
 import { CreatePaymentProposalModal } from "@/components/modal/CreatePaymentProposalModal";
-import { formatUsdc, type FundRound, type Group, type ReleaseProposal } from "@/lib/stellar-client";
+import { WithdrawContributionModal } from "@/components/modal/WithdrawContributionModal";
+import { CancelReleaseProposalModal } from "@/components/modal/CancelReleaseProposalModal";
+import { formatUsdc, USDC_DECIMALS, type FundRound, type Group, type ReleaseProposal } from "@/lib/stellar-client";
 import { ContributionsPanel } from "./contributions-panel";
 
 export interface GroupDashboardContentProps {
@@ -39,10 +35,14 @@ export interface GroupDashboardContentProps {
     onCreateProposal?: (params: { amountUsdc: number; destination: string }) => Promise<void>
     onCrearTreasury?: () => Promise<void>
     onProposeFundRound?: (totalAmountUsdc: number) => Promise<void>
+    onWithdrawContribution?: (roundId: bigint) => Promise<void>
+    onCancelReleaseProposal?: (proposalId: bigint) => Promise<void>
     isSubmitting: boolean
     isProposingRound?: boolean
     isApprovingTokens?: boolean
     isContributing?: boolean
+    isWithdrawing?: boolean
+    isCancelingRelease?: boolean
     memberContributions: { address: string; name?: string; totalAmount: bigint }[];
 }
 
@@ -62,15 +62,21 @@ export function GroupDashboardContent({
                                           onCreateProposal,
                                           onCrearTreasury,
                                           onProposeFundRound,
+                                          onWithdrawContribution,
+                                          onCancelReleaseProposal,
                                           isSubmitting,
                                           memberContributions,
                                           isProposingRound = false,
                                           isApprovingTokens = false,
                                           isContributing = false,
+                                          isWithdrawing = false,
+                                          isCancelingRelease = false,
                                       }: GroupDashboardContentProps) {
     const [proposeRoundModalOpen, setProposeRoundModalOpen] = useState(false);
     const [contributeModalOpen, setContributeModalOpen] = useState(false);
     const [createProposalModalOpen, setCreateProposalModalOpen] = useState(false);
+    const [withdrawModalOpen, setWithdrawModalOpen] = useState<bigint | null>(null);
+    const [cancelReleaseModalOpen, setCancelReleaseModalOpen] = useState<bigint | null>(null);
 
     // Función auxiliar interna compatible con ES anteriores a 2020
     const safeBigInt = (val: any): bigint => {
@@ -114,7 +120,7 @@ export function GroupDashboardContent({
             <section className="glass-card gradient-border mb-8 overflow-hidden p-1 animate-fade-up">
                 <div className="rounded-xl bg-background/60 p-8 text-center md:p-12">
                     <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        {group?.name || "Tesorería Grupal"}
+                        Tesorería Grupal
                     </p>
                     {hasTreasury ? (
                         <>
@@ -184,6 +190,16 @@ export function GroupDashboardContent({
                         isSubmitting={isSubmitting}
                     />
                 )}
+                {onCancelReleaseProposal && cancelReleaseModalOpen !== null && (
+                    <CancelReleaseProposalModal
+                        open={cancelReleaseModalOpen !== null}
+                        onOpenChange={(open) => setCancelReleaseModalOpen(open ? cancelReleaseModalOpen : null)}
+                        onCancel={() => onCancelReleaseProposal(cancelReleaseModalOpen)}
+                        isSubmitting={isCancelingRelease}
+                        destination={proposals.find(p => p.id === cancelReleaseModalOpen)?.destination}
+                        amount={proposals.find(p => p.id === cancelReleaseModalOpen) ? (Number(proposals.find(p => p.id === cancelReleaseModalOpen)!.amount) / 1e7).toFixed(2) : undefined}
+                    />
+                )}
                 {proposals.length === 0 ? (
                     <div className="glass-card rounded-2xl p-8 text-center">
                         <Check className="mx-auto h-8 w-8 text-primary/40" />
@@ -212,7 +228,7 @@ export function GroupDashboardContent({
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="shrink-0">
+                                        <div className="shrink-0 flex flex-col gap-2 sm:flex-row">
                                             {p.executed ? (
                                                 <span className="inline-flex items-center rounded-xl border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
                                                     Ejecutado
@@ -226,13 +242,25 @@ export function GroupDashboardContent({
                                                     {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : "Ejecutar Pago"}
                                                 </Button>
                                             ) : (
-                                                <Button
-                                                    disabled={isSubmitting}
-                                                    onClick={() => onApproveProposal(p.id)}
-                                                    className="w-full rounded-xl bg-brand-purple px-6 font-bold text-white sm:w-auto hover:brightness-110"
-                                                >
-                                                    {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : "Firmar"}
-                                                </Button>
+                                                <>
+                                                    <Button
+                                                        disabled={isSubmitting}
+                                                        onClick={() => onApproveProposal(p.id)}
+                                                        className="w-full rounded-xl bg-brand-purple px-6 font-bold text-white sm:w-auto hover:brightness-110"
+                                                    >
+                                                        {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : "Firmar"}
+                                                    </Button>
+                                                    {onCancelReleaseProposal && !p.executed && (
+                                                        <Button
+                                                            disabled={isSubmitting || isCancelingRelease}
+                                                            onClick={() => setCancelReleaseModalOpen(p.id)}
+                                                            variant="outline"
+                                                            className="w-full rounded-xl px-4 sm:w-auto"
+                                                        >
+                                                            {isCancelingRelease ? <Loader2 className="animate-spin h-4 w-4" /> : "Cancelar"}
+                                                        </Button>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -248,7 +276,7 @@ export function GroupDashboardContent({
                 <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-widest text-muted-foreground">
                     Recaudación de Fondos
                 </h2>
-                {activeRound ? (
+                {activeRound && fundedAmount < totalAmount ? (
                     <div className="glass-card gradient-border overflow-hidden rounded-2xl p-1">
                         <div className="rounded-xl bg-background/60 p-6 md:p-8">
                             <div className="flex items-start justify-between">
@@ -267,6 +295,31 @@ export function GroupDashboardContent({
                                 </div>
                                 <Progress value={progressPercent} className="h-3 bg-muted" />
                             </div>
+                            {(() => {
+                                const currentMember = memberContributions.find((m) => m.address === address);
+                                if (!currentMember) return null;
+                                const remainingForPerson = Math.max(-currentMember.balance, 0);
+                                const remainingForGoal = Math.max(0, Number(totalAmount - fundedAmount) / USDC_DECIMALS);
+                                const remaining = Math.min(remainingForPerson, remainingForGoal);
+                                const isCompleted = remaining < 0.01;
+                                
+                                return (
+                                    <div className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${isCompleted ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-primary/10 text-primary"}`}>
+                                        {isCompleted ? (
+                                            <>
+                                                <Check className="h-4 w-4 shrink-0" />
+                                                Ya aportaste tu parte de la ronda. ¡Gracias!
+                                            </>
+                                        ) : (
+                                            <p>
+                                                Tu aporte sugerido ahora:{" "}
+                                                <span className="font-bold">{remaining.toFixed(2)} USDC</span>{" "}
+                                                (falta {remainingForGoal.toFixed(2)} para la meta)
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                             <Button
                                 disabled={isContributing}
                                 onClick={() => setContributeModalOpen(true)}
@@ -282,7 +335,66 @@ export function GroupDashboardContent({
                                     onContribute={(amountUsdc) => onContribute(activeRound.id, amountUsdc)}
                                     isApproving={isApprovingTokens}
                                     isContributing={isContributing}
+                                    recommendedAmountUsdc={(() => {
+                                        const currentMember = memberContributions.find(
+                                            (m) => m.address === address
+                                        );
+                                        if (!currentMember) return undefined;
+                                        const remainingForPerson = Math.max(-currentMember.balance, 0);
+                                        const remainingForGoal = Math.max(0, Number(totalAmount - fundedAmount) / USDC_DECIMALS);
+                                        const remaining = Math.min(remainingForPerson, remainingForGoal);
+                                        
+                                        // Si le falta aportar, recomendamos eso.
+                                        if (remaining > 0.01) return remaining;
+                                        
+                                        // Si ya completó su parte pero igual quiere aportar más,
+                                        // le volvemos a mostrar el botón con la "meta equitativa" como sugerencia.
+                                        const fairShare = currentMember.fairShare || 0;
+                                        const fallback = Math.min(fairShare, remainingForGoal);
+                                        return fallback > 0.01 ? fallback : undefined;
+                                    })()}
+                                    maxAmountUsdc={(() => {
+                                        const remainingRaw = totalAmount - fundedAmount;
+                                        if (remainingRaw <= BigInt(0)) return 0;
+                                        return Number(remainingRaw) / USDC_DECIMALS;
+                                    })()}
                                 />
+                            )}
+                        </div>
+                    </div>
+                ) : activeRound && fundedAmount >= totalAmount ? (
+                    <div className="glass-card gradient-border overflow-hidden rounded-2xl p-1">
+                        <div className="rounded-xl bg-background/60 p-6 md:p-8">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Objetivo</p>
+                                    <p className="mt-1 font-display text-2xl font-bold text-foreground">
+                                        {formatUsdc(totalAmount)} <span className="text-sm font-normal text-muted-foreground">USDC</span>
+                                    </p>
+                                </div>
+                                <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Completada</span>
+                            </div>
+                            <div className="mt-6">
+                                <div className="mb-2 flex items-end justify-between">
+                                    <span className="text-sm font-semibold text-emerald-500 dark:text-emerald-400">Objetivo alcanzado</span>
+                                </div>
+                            </div>
+                            {onProposeFundRound && (
+                                <>
+                                    <Button
+                                        onClick={() => setProposeRoundModalOpen(true)}
+                                        disabled={isProposingRound}
+                                        className="mt-6 w-full gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:glow-lime sm:w-auto sm:px-8"
+                                    >
+                                        {isProposingRound ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear otra ronda"}
+                                    </Button>
+                                    <ProposeFundRoundModal
+                                        open={proposeRoundModalOpen}
+                                        onOpenChange={setProposeRoundModalOpen}
+                                        onPropose={onProposeFundRound}
+                                        isSubmitting={isProposingRound}
+                                    />
+                                </>
                             )}
                         </div>
                     </div>
@@ -296,14 +408,12 @@ export function GroupDashboardContent({
                                         {formatUsdc(totalAmount)} <span className="text-sm font-normal text-muted-foreground">USDC</span>
                                     </p>
                                 </div>
-                                <span className="rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary">Completada</span>
+                                <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Completada</span>
                             </div>
                             <div className="mt-6">
                                 <div className="mb-2 flex items-end justify-between">
-                                    <span className="text-sm font-semibold text-primary">{formatUsdc(fundedAmount)} USDC</span>
-                                    <span className="text-xs text-muted-foreground">100%</span>
+                                    <span className="text-sm font-semibold text-emerald-500 dark:text-emerald-400">Objetivo alcanzado</span>
                                 </div>
-                                <Progress value={100} className="h-3 bg-muted" />
                             </div>
                             {onProposeFundRound && (
                                 <>
@@ -363,6 +473,10 @@ export function GroupDashboardContent({
                 <ContributionsPanel
                     contributions={memberContributions}
                     isLoading={isLoading}
+                    currentUserAddress={address}
+                    activeRoundId={activeRound?.id}
+                    onWithdraw={onWithdrawContribution}
+                    isWithdrawing={isWithdrawing}
                 />
             </section>
 

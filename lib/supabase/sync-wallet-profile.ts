@@ -45,7 +45,9 @@ export async function syncWalletProfile(
       if (profileRow?.user_id) {
         userId = profileRow.user_id;
       } else {
-        // Fallback: find by listing (paginate in case there are many users)
+        // Fallback: find by listing (paginate in case there are many users).
+        // Compare emails case-insensitively (Supabase Auth may normalize to lowercase).
+        const emailLower = email.toLowerCase();
         let page = 1;
         const perPage = 500;
         let found: { id: string } | null = null;
@@ -55,7 +57,9 @@ export async function syncWalletProfile(
           if (listError) {
             throw new Error(`Supabase listUsers: ${listError.message}`);
           }
-          const existing = listData.users.find((u) => u.email === email);
+          const existing = listData.users.find(
+            (u) => u.email != null && u.email.toLowerCase() === emailLower
+          );
           if (existing) {
             found = { id: existing.id };
             break;

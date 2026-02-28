@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Award, ArrowUpRight, ArrowDownLeft, Info, Loader2 } from "lucide-react";
+import { Award, ArrowUpRight, ArrowDownLeft, Info, Loader2, LogOut, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatUsdc } from "@/lib/stellar-client";
+import { WithdrawContributionModal } from "@/components/modal/WithdrawContributionModal";
 
 const USDC_DECIMALS = 10_000_000;
 
@@ -15,17 +17,25 @@ function shortAddress(address: string): string {
 /** If balance is missing, derive from totalAmount and fair share (for mock or client-only). */
 function withBalances(
   items: ContributionItem[]
-): { address: string; name?: string; totalAmount: bigint; balance: number }[] {
+): { address: string; name?: string; totalAmount: bigint; balance: number; contributedRelevant: number; fairShare: number }[] {
   if (items.length === 0) return [];
-  const hasAnyBalance = items.some((m) => m.balance !== undefined && m.balance !== null);
-  if (hasAnyBalance) {
-    return items.map((m) => ({ ...m, balance: m.balance ?? 0 }));
-  }
   const totalRaw = items.reduce((acc, m) => acc + m.totalAmount, BigInt(0));
   const fairShare = Number(totalRaw) / USDC_DECIMALS / items.length;
+  const hasAnyBalance = items.some((m) => m.balance !== undefined && m.balance !== null);
+  const hasSaldosData = items.some((m) => m.contributedRelevant != null && m.fairShare != null);
+  if (hasAnyBalance || hasSaldosData) {
+    return items.map((m) => ({
+      ...m,
+      balance: m.balance ?? (Number(m.totalAmount) / USDC_DECIMALS - (m.fairShare ?? fairShare)),
+      contributedRelevant: m.contributedRelevant ?? Number(m.totalAmount) / USDC_DECIMALS,
+      fairShare: m.fairShare ?? fairShare,
+    }));
+  }
   return items.map((m) => ({
     ...m,
     balance: Number(m.totalAmount) / USDC_DECIMALS - fairShare,
+    contributedRelevant: Number(m.totalAmount) / USDC_DECIMALS,
+    fairShare,
   }));
 }
 
@@ -34,22 +44,38 @@ export interface ContributionItem {
   name?: string;
   totalAmount: bigint;
   balance?: number;
+  /** Aportado en rondas relevantes (para saldos). */
+  contributedRelevant?: number;
+  /** Meta equitativa por persona (para saldos). */
+  fairShare?: number;
 }
 
 export function ContributionsPanel({
   contributions = [],
   isLoading = false,
+  currentUserAddress,
+  activeRoundId,
+  onWithdraw,
+  isWithdrawing = false,
 }: {
   contributions?: ContributionItem[];
   isLoading?: boolean;
+  currentUserAddress?: string;
+  activeRoundId?: bigint;
+  onWithdraw?: (roundId: bigint) => Promise<void>;
+  isWithdrawing?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<"aportes" | "saldos">("aportes");
+  const [activeTab, setActiveTab] = useState<"aportes" | "saldos" | "deudas">("aportes");
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const withBalance = withBalances(contributions);
 
   const sortedAportes = [...withBalance].sort((a, b) =>
     a.totalAmount > b.totalAmount ? -1 : a.totalAmount < b.totalAmount ? 1 : 0
   );
   const sortedSaldos = [...withBalance].sort((a, b) => b.balance - a.balance);
+  const sortedDeudas = [...withBalance].sort((a, b) => a.balance - b.balance);
+
+  const isCurrentUser = contributions.some((c) => c.address === currentUserAddress);
 
     return (
         <section className="mt-8 animate-fade-up">
@@ -74,7 +100,17 @@ export function ContributionsPanel({
                                 : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
-                        Saldos y Deudas
+                        Saldos
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("deudas")}
+                        className={`rounded-lg px-6 py-2 text-xs font-bold transition-all ${
+                            activeTab === "deudas"
+                                ? "bg-destructive text-destructive-foreground shadow-lg"
+                                : "text-muted-foreground hover:text-foreground"
+                        }`}
+                    >
+                        Deudas
                     </button>
                 </div>
             </div>
@@ -88,9 +124,21 @@ export function ContributionsPanel({
                         <p>
                             {activeTab === "aportes"
                                 ? "Historial total de USDC enviados a la tesorería desde la creación del grupo."
-                                : "Cálculo basado en la meta equitativa de las rondas de fondeo activas."}
+                                : activeTab === "saldos"
+                                ? "Cálculo basado en la meta equitativa de las rondas de fondeo activas."
+                                : "Deudas y saldos a favor calculados respecto a la meta equitativa del grupo."}
                         </p>
                     </div>
+
+                    {onWithdraw && activeRoundId && isCurrentUser && (
+                        <WithdrawContributionModal
+                            open={withdrawModalOpen}
+                            onOpenChange={setWithdrawModalOpen}
+                            onWithdraw={() => onWithdraw(activeRoundId)}
+                            isSubmitting={isWithdrawing}
+                            roundId={activeRoundId}
+                        />
+                    )}
 
                     <div className="space-y-3">
                         {isLoading ? (
@@ -98,17 +146,21 @@ export function ContributionsPanel({
                                 <Loader2 className="h-5 w-5 animate-spin" />
                                 <span className="text-sm">Cargando aportes...</span>
                             </div>
-                        ) : (activeTab === "aportes" ? sortedAportes : sortedSaldos).length === 0 ? (
+                        ) : (activeTab === "aportes" ? sortedAportes : activeTab === "saldos" ? sortedSaldos : sortedDeudas).length === 0 ? (
                             <div className="py-8 text-center text-sm text-muted-foreground">
                                 {activeTab === "aportes"
                                   ? "Aún no hay aportes en las rondas de fondeo."
-                                  : "No hay saldos que mostrar."}
+                                  : "No hay datos que mostrar."}
                             </div>
                         ) : (
-                            (activeTab === "aportes" ? sortedAportes : sortedSaldos).map((member, i) => {
-                                const isPositive = (member.balance ?? 0) > 0;
+                            (activeTab === "aportes" ? sortedAportes : activeTab === "saldos" ? sortedSaldos : sortedDeudas).map((member, i) => {
+                                const balanceNum = member.balance ?? 0;
+                                const isExact = Math.abs(balanceNum) < 0.01;
+                                const isPositive = balanceNum >= 0.01;
+                                const absBalance = Math.abs(balanceNum);
                                 const displayName = member.name ?? shortAddress(member.address);
                                 const initial = displayName[0]?.toUpperCase() ?? "?";
+                                const isCurrentUserMember = member.address === currentUserAddress;
 
                                 return (
                                     <div
@@ -131,30 +183,64 @@ export function ContributionsPanel({
                                             <div>
                                                 <p className="text-sm font-medium text-foreground">{displayName}</p>
                                                 <p className="text-[10px] text-muted-foreground">
-                                                    {activeTab === "aportes" ? "Aportante" : isPositive ? "Al día" : "Pendiente"}
+                                                    {activeTab === "aportes" ? "Aportante" : isExact ? "Completado" : isPositive ? "Al día" : "Pendiente"}
                                                 </p>
                                             </div>
                                         </div>
 
-                                        <div className="text-right">
-                                            {activeTab === "aportes" ? (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="font-display text-lg font-bold text-primary">
-                                                        {formatUsdc(member.totalAmount)}{" "}
-                                                        <span className="text-[10px] text-muted-foreground">USDC</span>
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-end">
-                                                    <div className={`flex items-center gap-1 font-display text-lg font-bold ${isPositive ? "text-primary" : "text-brand-purple"}`}>
-                                                        {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
-                                                        {Math.abs(member.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                        <span className="text-[10px] opacity-70">USDC</span>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-right">
+                                                {activeTab === "aportes" ? (
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="font-display text-lg font-bold text-primary">
+                                                            {formatUsdc(member.totalAmount)}{" "}
+                                                            <span className="text-[10px] text-muted-foreground">USDC</span>
+                                                        </span>
                                                     </div>
-                                                    <p className={`text-[10px] font-medium ${isPositive ? "text-primary/70" : "text-brand-purple/70"}`}>
-                                                        {isPositive ? "a favor" : "debe aportar"}
-                                                    </p>
-                                                </div>
+                                                ) : activeTab === "saldos" ? (
+                                                    <div className="flex flex-col items-end">
+                                                        <div className={`flex items-center gap-1 font-display text-lg font-bold ${isExact ? "text-emerald-500" : isPositive ? "text-primary" : "text-brand-purple"}`}>
+                                                            {isExact ? <CheckCircle2 className="h-4 w-4" /> : isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+                                                            {(member.contributedRelevant ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                            <span className="text-muted-foreground font-normal"> / </span>
+                                                            {(member.fairShare ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                            <span className="text-[10px] opacity-70">USDC</span>
+                                                        </div>
+                                                        <p className={`text-[10px] font-medium ${isExact ? "text-emerald-500/70" : isPositive ? "text-primary/70" : "text-brand-purple/70"}`}>
+                                                            {isExact ? "meta alcanzada" : isPositive ? "a favor" : "debe aportar"}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-end">
+                                                        <div className={`flex items-center gap-1 font-display text-lg font-bold ${isExact ? "text-emerald-500" : isPositive ? "text-primary" : "text-destructive"}`}>
+                                                            {isExact ? <CheckCircle2 className="h-4 w-4" /> : isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+                                                            {absBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                            <span className="text-[10px] opacity-70">USDC</span>
+                                                        </div>
+                                                        <p className={`text-[10px] font-medium ${isExact ? "text-emerald-500/70" : isPositive ? "text-primary/70" : "text-destructive/70"}`}>
+                                                            {isExact ? "saldo 0" : isPositive ? "le deben" : "debe al grupo"}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {onWithdraw && activeRoundId && isCurrentUserMember && activeTab === "aportes" && (
+                                                <Button
+                                                    onClick={() => setWithdrawModalOpen(true)}
+                                                    disabled={isWithdrawing}
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="gap-1.5 rounded-lg px-2 text-xs hover:bg-destructive/10 hover:text-destructive"
+                                                    title="Retirar aporte de esta ronda"
+                                                >
+                                                    {isWithdrawing ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <>
+                                                            <LogOut className="h-3.5 w-3.5" />
+                                                            <span className="hidden sm:inline">Retirar</span>
+                                                        </>
+                                                    )}
+                                                </Button>
                                             )}
                                         </div>
                                     </div>

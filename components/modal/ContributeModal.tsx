@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,10 @@ export interface ContributeModalProps {
   onContribute: (amountUsdc: number) => Promise<void>
   isApproving?: boolean
   isContributing?: boolean
+  /** Monto recomendado en USDC (objetivo ÷ miembros). Se usa como valor por defecto y para avisar si aportás más. */
+  recommendedAmountUsdc?: number
+  /** Máximo permitido para no superar la meta de la ronda (lo que falta menos 1 unidad). */
+  maxAmountUsdc?: number
 }
 
 export function ContributeModal({
@@ -30,10 +34,18 @@ export function ContributeModal({
   onContribute,
   isApproving = false,
   isContributing = false,
+  recommendedAmountUsdc,
+  maxAmountUsdc,
 }: ContributeModalProps) {
   const [amount, setAmount] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [permissionDone, setPermissionDone] = useState(false)
+
+  useEffect(() => {
+    if (open && recommendedAmountUsdc != null && recommendedAmountUsdc > 0) {
+      setAmount(recommendedAmountUsdc.toFixed(2))
+    }
+  }, [open, recommendedAmountUsdc])
 
   const amountNum = (() => {
     const v = parseFloat(amount.replace(",", "."))
@@ -43,6 +55,10 @@ export function ContributeModal({
   const handleApprove = async () => {
     if (amountNum == null) {
       setError("Ingresá un monto válido mayor a 0.")
+      return
+    }
+    if (maxAmountUsdc != null && amountNum > maxAmountUsdc + 1e-9) {
+      setError(`El máximo para esta ronda es ${maxAmountUsdc.toFixed(2)} USDC.`)
       return
     }
     setError(null)
@@ -56,6 +72,10 @@ export function ContributeModal({
 
   const handleContribute = async () => {
     if (amountNum == null) return
+    if (maxAmountUsdc != null && amountNum > maxAmountUsdc + 1e-9) {
+      setError(`El máximo para esta ronda es ${maxAmountUsdc.toFixed(2)} USDC.`)
+      return
+    }
     setError(null)
     try {
       await onContribute(amountNum)
@@ -90,19 +110,54 @@ export function ContributeModal({
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="contribute-amount">Monto (USDC)</Label>
-            <Input
-              id="contribute-amount"
-              type="text"
-              inputMode="decimal"
-              placeholder="Ej: 50"
-              value={amount}
-              onChange={(e) => {
-                setAmount(e.target.value)
-                setPermissionDone(false)
-              }}
-              disabled={isApproving || isContributing}
-              className="font-mono"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="contribute-amount"
+                type="text"
+                inputMode="decimal"
+                placeholder="Ej: 50"
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value)
+                  setPermissionDone(false)
+                }}
+                disabled={isApproving || isContributing}
+                className="font-mono flex-1"
+              />
+              {recommendedAmountUsdc != null && recommendedAmountUsdc > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const toSet = maxAmountUsdc != null
+                      ? Math.min(recommendedAmountUsdc, maxAmountUsdc).toFixed(2)
+                      : recommendedAmountUsdc.toFixed(2)
+                    setAmount(toSet)
+                    setPermissionDone(false)
+                  }}
+                  disabled={isApproving || isContributing}
+                  className="shrink-0 whitespace-nowrap"
+                >
+                  Pagar {recommendedAmountUsdc.toFixed(2)}
+                </Button>
+              )}
+            </div>
+            {maxAmountUsdc != null && maxAmountUsdc > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Máximo para esta ronda: <span className="font-medium text-foreground">{maxAmountUsdc.toFixed(2)} USDC</span>
+              </p>
+            )}
+            {recommendedAmountUsdc != null && amountNum != null && amountNum > recommendedAmountUsdc + 1e-9 && amountNum <= (maxAmountUsdc ?? Infinity) + 1e-9 && (
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                Estás aportando más de lo recomendado ({recommendedAmountUsdc.toFixed(2)} USDC por persona).
+              </p>
+            )}
+            {maxAmountUsdc != null && amountNum != null && amountNum > maxAmountUsdc + 1e-9 && (
+              <p className="text-xs font-medium text-destructive">
+                Superás el máximo permitido para esta ronda ({maxAmountUsdc.toFixed(2)} USDC).
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

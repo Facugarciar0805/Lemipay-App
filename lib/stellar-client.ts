@@ -17,7 +17,7 @@ export const STELLAR_CONFIG = {
   sorobanUrl: "https://soroban-testnet.stellar.org",
   contracts: {
     groups: "CABYTW7GMOYRDOEYUTFQOFTYGPEFUZOOGYDIJLSYLDP7XFWQ4A2TFXP2",
-    treasury: "CCCRRA4DSWP6UAJTF5XNK7VLD3TASQA3D274WBN5F3RDXLNI4DHJM7IZ",
+    treasury: "CB2NG4BAHP3ZA2QPLLBPWMI6O27VRGK22GSUJAWHTDPDSNXCBPXPVJ24",
     /** USDC token (testnet). Override with NEXT_PUBLIC_USDC_CONTRACT_ID if different. */
     usdc: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
   },
@@ -27,9 +27,11 @@ export const STELLAR_CONFIG = {
 export const CREATE_GROUP_CONTRACT_ID =
   process.env.NEXT_PUBLIC_CREATE_GROUP_CONTRACT_ID ?? STELLAR_CONFIG.contracts.groups
 
-/** Treasury contract ID. Override with NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID. */
+/** Treasury contract ID. Override with NEXT_PUBLIC_NEW_CREATE_TREASURY_CONTRACT_ID or fallback to NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID. */
 export const TREASURY_CONTRACT_ID =
-  process.env.NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID ?? STELLAR_CONFIG.contracts.treasury
+  process.env.NEXT_PUBLIC_NEW_CREATE_TREASURY_CONTRACT_ID ??
+  process.env.NEXT_PUBLIC_CREATE_TREASURY_CONTRACT_ID ??
+  STELLAR_CONFIG.contracts.treasury
 
 /** USDC token contract ID. Override with NEXT_PUBLIC_USDC_CONTRACT_ID. */
 export const USDC_CONTRACT_ID =
@@ -437,40 +439,65 @@ export interface MemberContributionInfo {
   totalAmount: bigint
   /** Balance in USDC (display): positive = a favor, negative = debe aportar. */
   balance: number
+  /** Amount contributed in relevant rounds (for saldos display). */
+  contributedRelevant: number
+  /** Fair share / target per person in relevant rounds (for saldos display). */
+  fairShare: number
+}
+
+/** Minimal round info for balance calculation. */
+export interface FundRoundForBalance {
+  id: bigint
+  totalAmount: bigint
+  completed: boolean
 }
 
 /**
- * Fetches each member's total contribution across all rounds and computes balance (fair share - contribution).
+ * Fetches each member's total contribution and computes balance.
+ * Uses "meta equitativa" (target per round) for fair share, considering only active rounds.
+ * Balance = contribution - fairShare; positive = a favor, negative = debe aportar.
  */
 export async function getGroupMemberContributions(
-  groupId: bigint,
+  _groupId: bigint,
   sourceAddress: string,
   members: string[],
-  roundIds: bigint[]
+  fundRounds: FundRoundForBalance[]
 ): Promise<MemberContributionInfo[]> {
-  const contributions: { address: string; totalAmount: bigint }[] = []
+  const activeRounds = fundRounds.filter((r) => !r.completed)
+  const roundsForFairShare = activeRounds.length > 0 ? activeRounds : fundRounds
+  const memberCount = members.length
+  if (memberCount === 0) return []
+
+  // Fair share = sum of (round target / members) for each round (meta equitativa).
+  // Prefer active rounds; if none, use all rounds for historical balance.
+  const fairShareDisplay = roundsForFairShare.reduce(
+    (acc, r) => acc + Number(r.totalAmount) / USDC_DECIMALS / memberCount,
+    0
+  )
+
+  const contributions: { address: string; totalAmount: bigint; relevantAmount: bigint }[] = []
 
   for (const address of members) {
     let total = BigInt(0)
-    for (const roundId of roundIds) {
-      const amount = await getUserContribution(roundId, address, sourceAddress)
+    let relevantTotal = BigInt(0)
+    for (const round of fundRounds) {
+      const amount = await getUserContribution(round.id, address, sourceAddress)
       total += amount
+      const isRelevant = roundsForFairShare.some((r) => r.id === round.id)
+      if (isRelevant) relevantTotal += amount
     }
-    contributions.push({ address, totalAmount: total })
+    contributions.push({ address, totalAmount: total, relevantAmount: relevantTotal })
   }
 
-  const totalContributed = contributions.reduce((acc, c) => acc + c.totalAmount, BigInt(0))
-  const memberCount = members.length
-  const fairShareRaw =
-    memberCount > 0 ? totalContributed / BigInt(memberCount) : BigInt(0)
-
   return contributions.map((c) => {
-    const balanceRaw = c.totalAmount - fairShareRaw
-    const balanceDisplay = Number(balanceRaw) / USDC_DECIMALS
+    const contributionDisplay = Number(c.relevantAmount) / USDC_DECIMALS
+    const balanceDisplay = contributionDisplay - fairShareDisplay
     return {
       address: c.address,
       totalAmount: c.totalAmount,
       balance: balanceDisplay,
+      contributedRelevant: contributionDisplay,
+      fairShare: fairShareDisplay,
     }
   })
 }
@@ -503,3 +530,94 @@ export interface UserContribution {
   address: string
   amount: bigint
 }
+
+/**
+ * Returns the total balance of a group's treasury (calls get_group_balance on Treasury contract).
+ */
+export async function getGroupBalance(
+  groupId: bigint,
+  sourceAddress: string
+): Promise<bigint> {
+  const server = getSorobanServer()
+  let account
+  try {
+    account = await server.getAccount(sourceAddress)
+  } catch {
+    return BigInt(0)
+  }
+  const contract = new Contract(TREASURY_CONTRACT_ID)
+  const invokeOp = contract.call(
+    "get_group_balance",
+    nativeToScVal(groupId, { type: "u64" })
+  )
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_CONFIG.networkPassphrase,
+  })
+    .addOperation(invokeOp)
+    .setTimeout(60)
+  const rawTx = builder.build()
+  let simulation: rpc.Api.SimulateTransactionResponse
+  try {
+    simulation = await server.simulateTransaction(rawTx)
+  } catch {
+    return BigInt(0)
+  }
+  if (rpc.Api.isSimulationError(simulation)) return BigInt(0)
+  const result = simulation.result
+  if (!result?.retval) return BigInt(0)
+  try {
+    const decoded = scValToNative(result.retval) as bigint
+    return typeof decoded === "bigint" ? decoded : BigInt(0)
+  } catch {
+    return BigInt(0)
+  }
+}
+
+/**
+ * Checks if a group has sufficient balance for a given amount (calls has_sufficient_group_balance on Treasury contract).
+ */
+export async function hasSufficientGroupBalance(
+  groupId: bigint,
+  amount: bigint,
+  sourceAddress: string
+): Promise<boolean> {
+  const server = getSorobanServer()
+  let account
+  try {
+    account = await server.getAccount(sourceAddress)
+  } catch {
+    return false
+  }
+  const contract = new Contract(TREASURY_CONTRACT_ID)
+  const invokeOp = contract.call(
+    "has_sufficient_group_balance",
+    nativeToScVal(groupId, { type: "u64" }),
+    nativeToScVal(amount, { type: "i128" })
+  )
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_CONFIG.networkPassphrase,
+  })
+    .addOperation(invokeOp)
+    .setTimeout(60)
+  const rawTx = builder.build()
+  let simulation: rpc.Api.SimulateTransactionResponse
+  try {
+    simulation = await server.simulateTransaction(rawTx)
+  } catch {
+    return false
+  }
+  if (rpc.Api.isSimulationError(simulation)) return false
+  const result = simulation.result
+  if (!result?.retval) return false
+  try {
+    const decoded = scValToNative(result.retval) as boolean
+    return decoded === true
+  } catch {
+    return false
+  }
+}
+
+// ─── Types ──────────────────────────────────────────────────────
+
