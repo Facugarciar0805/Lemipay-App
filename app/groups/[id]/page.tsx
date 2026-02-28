@@ -16,6 +16,7 @@ import {
   checkTreasuryExists,
   getGroupFundRounds,
   getGroupMemberContributions,
+  getGroupBalance,
   getReleaseProposalsOfGroup,
 } from "@/lib/stellar-client"
 import type { MemberContributionInfo, ReleaseProposal } from "@/lib/stellar-client"
@@ -157,10 +158,9 @@ export default async function GroupPage({
     ? await getReleaseProposalsOfGroup(groupId, publicKey)
     : []
 
-  const totalBalance = fundRounds.reduce(
-    (acc, r) => acc + r.fundedAmount,
-    BigInt(0)
-  )
+  const totalBalance = hasTreasury
+    ? await getGroupBalance(groupId, publicKey)
+    : BigInt(0)
 
   let memberContributions: MemberContributionInfo[] =
     hasTreasury && fundRounds.length > 0 && group.members.length > 0

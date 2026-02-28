@@ -4,7 +4,8 @@ import { getWalletGroups } from "@/lib/supabase/wallet-groups";
 import {
     STELLAR_CONFIG,
     getSorobanServer,
-    formatUsdc
+    formatUsdc,
+    getGroupBalance,
 } from "@/lib/stellar-client";
 
 export async function GET(request: Request) {
@@ -23,7 +24,6 @@ export async function GET(request: Request) {
 
         // 2. Definición de contratos
         const groupsContract = new Contract(STELLAR_CONFIG.contracts.groups);
-        const treasuryContract = new Contract(STELLAR_CONFIG.contracts.treasury);
 
         // Necesitamos una instancia de Account para construir la transacción de simulación
         // Usamos el address del usuario con una secuencia de "0" ya que no vamos a enviarla realmente
@@ -49,30 +49,12 @@ export async function GET(request: Request) {
                 }
                 const groupInfo = scValToNative(groupSim.result.retval);
 
-                // --- SIMULACIÓN BALANCE TOTAL ---
-                const txRounds = new TransactionBuilder(sourceAccount, { fee: "100", networkPassphrase })
-                    .addOperation(treasuryContract.call("get_group_rounds", scId))
-                    .setTimeout(0)
-                    .build();
-
-                const roundsSim = await server.simulateTransaction(txRounds);
-
+                // Balance del grupo desde el contrato (get_group_balance)
                 let totalStroops = BigInt(0);
-                if (rpc.Api.isSimulationSuccess(roundsSim)) {
-                    const roundIds: bigint[] = scValToNative(roundsSim.result.retval);
-
-                    for (const rId of roundIds) {
-                        const txRound = new TransactionBuilder(sourceAccount, { fee: "100", networkPassphrase })
-                            .addOperation(treasuryContract.call("get_fund_round", nativeToScVal(rId, { type: "u64" })))
-                            .setTimeout(0)
-                            .build();
-
-                        const rSim = await server.simulateTransaction(txRound);
-                        if (rpc.Api.isSimulationSuccess(rSim)) {
-                            const rData = scValToNative(rSim.result.retval);
-                            totalStroops += BigInt(rData.funded_amount);
-                        }
-                    }
+                try {
+                    totalStroops = await getGroupBalance(bigId, address);
+                } catch {
+                    totalStroops = BigInt(0);
                 }
 
                 return {

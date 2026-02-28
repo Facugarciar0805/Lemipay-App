@@ -343,7 +343,15 @@ export function GroupDashboardContent({
                                         const remainingForPerson = Math.max(-currentMember.balance, 0);
                                         const remainingForGoal = Math.max(0, Number(totalAmount - fundedAmount) / USDC_DECIMALS);
                                         const remaining = Math.min(remainingForPerson, remainingForGoal);
-                                        return remaining > 0.01 ? remaining : undefined;
+                                        
+                                        // Si le falta aportar, recomendamos eso.
+                                        if (remaining > 0.01) return remaining;
+                                        
+                                        // Si ya completó su parte pero igual quiere aportar más,
+                                        // le volvemos a mostrar el botón con la "meta equitativa" como sugerencia.
+                                        const fairShare = currentMember.fairShare || 0;
+                                        const fallback = Math.min(fairShare, remainingForGoal);
+                                        return fallback > 0.01 ? fallback : undefined;
                                     })()}
                                     maxAmountUsdc={(() => {
                                         const remainingRaw = totalAmount - fundedAmount;
