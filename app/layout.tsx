@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
 
 import './globals.css'
+import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 
 const _inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const _spaceMono = Space_Mono({
@@ -27,7 +29,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${_inter.variable} ${_spaceMono.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <ThemeProvider attribute="class" defaultTheme="dark">
+          {children}
+          <Toaster />
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

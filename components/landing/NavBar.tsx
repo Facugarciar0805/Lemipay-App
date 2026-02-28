@@ -22,7 +22,8 @@ const Navbar = ({
     { label: "About", href: "/about" },
     { label: "How It Works", href: "#como-funciona" },
     { label: "Dashboard", href: "#dashboard" },
-    { label: "FAQ", href: "#faq" },
+    { label: "Contact", href: "/contact" },
+    { label: "Newsletter", href: "#newsletter" },
   ];
 
   const buttonLabel = isConnecting
