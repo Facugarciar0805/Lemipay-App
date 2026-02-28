@@ -439,40 +439,65 @@ export interface MemberContributionInfo {
   totalAmount: bigint
   /** Balance in USDC (display): positive = a favor, negative = debe aportar. */
   balance: number
+  /** Amount contributed in relevant rounds (for saldos display). */
+  contributedRelevant: number
+  /** Fair share / target per person in relevant rounds (for saldos display). */
+  fairShare: number
+}
+
+/** Minimal round info for balance calculation. */
+export interface FundRoundForBalance {
+  id: bigint
+  totalAmount: bigint
+  completed: boolean
 }
 
 /**
- * Fetches each member's total contribution across all rounds and computes balance (fair share - contribution).
+ * Fetches each member's total contribution and computes balance.
+ * Uses "meta equitativa" (target per round) for fair share, considering only active rounds.
+ * Balance = contribution - fairShare; positive = a favor, negative = debe aportar.
  */
 export async function getGroupMemberContributions(
-  groupId: bigint,
+  _groupId: bigint,
   sourceAddress: string,
   members: string[],
-  roundIds: bigint[]
+  fundRounds: FundRoundForBalance[]
 ): Promise<MemberContributionInfo[]> {
-  const contributions: { address: string; totalAmount: bigint }[] = []
+  const activeRounds = fundRounds.filter((r) => !r.completed)
+  const roundsForFairShare = activeRounds.length > 0 ? activeRounds : fundRounds
+  const memberCount = members.length
+  if (memberCount === 0) return []
+
+  // Fair share = sum of (round target / members) for each round (meta equitativa).
+  // Prefer active rounds; if none, use all rounds for historical balance.
+  const fairShareDisplay = roundsForFairShare.reduce(
+    (acc, r) => acc + Number(r.totalAmount) / USDC_DECIMALS / memberCount,
+    0
+  )
+
+  const contributions: { address: string; totalAmount: bigint; relevantAmount: bigint }[] = []
 
   for (const address of members) {
     let total = BigInt(0)
-    for (const roundId of roundIds) {
-      const amount = await getUserContribution(roundId, address, sourceAddress)
+    let relevantTotal = BigInt(0)
+    for (const round of fundRounds) {
+      const amount = await getUserContribution(round.id, address, sourceAddress)
       total += amount
+      const isRelevant = roundsForFairShare.some((r) => r.id === round.id)
+      if (isRelevant) relevantTotal += amount
     }
-    contributions.push({ address, totalAmount: total })
+    contributions.push({ address, totalAmount: total, relevantAmount: relevantTotal })
   }
 
-  const totalContributed = contributions.reduce((acc, c) => acc + c.totalAmount, BigInt(0))
-  const memberCount = members.length
-  const fairShareRaw =
-    memberCount > 0 ? totalContributed / BigInt(memberCount) : BigInt(0)
-
   return contributions.map((c) => {
-    const balanceRaw = c.totalAmount - fairShareRaw
-    const balanceDisplay = Number(balanceRaw) / USDC_DECIMALS
+    const contributionDisplay = Number(c.relevantAmount) / USDC_DECIMALS
+    const balanceDisplay = contributionDisplay - fairShareDisplay
     return {
       address: c.address,
       totalAmount: c.totalAmount,
       balance: balanceDisplay,
+      contributedRelevant: contributionDisplay,
+      fairShare: fairShareDisplay,
     }
   })
 }

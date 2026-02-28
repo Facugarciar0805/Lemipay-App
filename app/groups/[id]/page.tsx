@@ -168,7 +168,7 @@ export default async function GroupPage({
           groupId,
           publicKey,
           group.members,
-          fundRounds.map((r) => r.id)
+          fundRounds.map((r) => ({ id: r.id, totalAmount: r.totalAmount, completed: r.completed }))
         )
       : []
 

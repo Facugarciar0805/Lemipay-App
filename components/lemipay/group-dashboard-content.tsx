@@ -16,7 +16,7 @@ import { ContributeModal } from "@/components/modal/ContributeModal";
 import { CreatePaymentProposalModal } from "@/components/modal/CreatePaymentProposalModal";
 import { WithdrawContributionModal } from "@/components/modal/WithdrawContributionModal";
 import { CancelReleaseProposalModal } from "@/components/modal/CancelReleaseProposalModal";
-import { formatUsdc, type FundRound, type Group, type ReleaseProposal } from "@/lib/stellar-client";
+import { formatUsdc, USDC_DECIMALS, type FundRound, type Group, type ReleaseProposal } from "@/lib/stellar-client";
 import { ContributionsPanel } from "./contributions-panel";
 
 export interface GroupDashboardContentProps {
@@ -276,7 +276,7 @@ export function GroupDashboardContent({
                 <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-widest text-muted-foreground">
                     Recaudación de Fondos
                 </h2>
-                {activeRound ? (
+                {activeRound && fundedAmount < totalAmount ? (
                     <div className="glass-card gradient-border overflow-hidden rounded-2xl p-1">
                         <div className="rounded-xl bg-background/60 p-6 md:p-8">
                             <div className="flex items-start justify-between">
@@ -295,6 +295,31 @@ export function GroupDashboardContent({
                                 </div>
                                 <Progress value={progressPercent} className="h-3 bg-muted" />
                             </div>
+                            {(() => {
+                                const currentMember = memberContributions.find((m) => m.address === address);
+                                if (!currentMember) return null;
+                                const remainingForPerson = Math.max(-currentMember.balance, 0);
+                                const remainingForGoal = Math.max(0, Number(totalAmount - fundedAmount) / USDC_DECIMALS);
+                                const remaining = Math.min(remainingForPerson, remainingForGoal);
+                                const isCompleted = remaining < 0.01;
+                                
+                                return (
+                                    <div className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${isCompleted ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-primary/10 text-primary"}`}>
+                                        {isCompleted ? (
+                                            <>
+                                                <Check className="h-4 w-4 shrink-0" />
+                                                Ya aportaste tu parte de la ronda. ¡Gracias!
+                                            </>
+                                        ) : (
+                                            <p>
+                                                Tu aporte sugerido ahora:{" "}
+                                                <span className="font-bold">{remaining.toFixed(2)} USDC</span>{" "}
+                                                (falta {remainingForGoal.toFixed(2)} para la meta)
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                             <Button
                                 disabled={isContributing}
                                 onClick={() => setContributeModalOpen(true)}
@@ -310,7 +335,58 @@ export function GroupDashboardContent({
                                     onContribute={(amountUsdc) => onContribute(activeRound.id, amountUsdc)}
                                     isApproving={isApprovingTokens}
                                     isContributing={isContributing}
+                                    recommendedAmountUsdc={(() => {
+                                        const currentMember = memberContributions.find(
+                                            (m) => m.address === address
+                                        );
+                                        if (!currentMember) return undefined;
+                                        const remainingForPerson = Math.max(-currentMember.balance, 0);
+                                        const remainingForGoal = Math.max(0, Number(totalAmount - fundedAmount) / USDC_DECIMALS);
+                                        const remaining = Math.min(remainingForPerson, remainingForGoal);
+                                        return remaining > 0.01 ? remaining : undefined;
+                                    })()}
+                                    maxAmountUsdc={(() => {
+                                        const remainingRaw = totalAmount - fundedAmount;
+                                        if (remainingRaw <= BigInt(0)) return 0;
+                                        return Number(remainingRaw) / USDC_DECIMALS;
+                                    })()}
                                 />
+                            )}
+                        </div>
+                    </div>
+                ) : activeRound && fundedAmount >= totalAmount ? (
+                    <div className="glass-card gradient-border overflow-hidden rounded-2xl p-1">
+                        <div className="rounded-xl bg-background/60 p-6 md:p-8">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Objetivo</p>
+                                    <p className="mt-1 font-display text-2xl font-bold text-foreground">
+                                        {formatUsdc(totalAmount)} <span className="text-sm font-normal text-muted-foreground">USDC</span>
+                                    </p>
+                                </div>
+                                <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Completada</span>
+                            </div>
+                            <div className="mt-6">
+                                <div className="mb-2 flex items-end justify-between">
+                                    <span className="text-sm font-semibold text-emerald-500 dark:text-emerald-400">Objetivo alcanzado</span>
+                                </div>
+                            </div>
+                            {onProposeFundRound && (
+                                <>
+                                    <Button
+                                        onClick={() => setProposeRoundModalOpen(true)}
+                                        disabled={isProposingRound}
+                                        className="mt-6 w-full gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:glow-lime sm:w-auto sm:px-8"
+                                    >
+                                        {isProposingRound ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear otra ronda"}
+                                    </Button>
+                                    <ProposeFundRoundModal
+                                        open={proposeRoundModalOpen}
+                                        onOpenChange={setProposeRoundModalOpen}
+                                        onPropose={onProposeFundRound}
+                                        isSubmitting={isProposingRound}
+                                    />
+                                </>
                             )}
                         </div>
                     </div>
@@ -324,14 +400,12 @@ export function GroupDashboardContent({
                                         {formatUsdc(totalAmount)} <span className="text-sm font-normal text-muted-foreground">USDC</span>
                                     </p>
                                 </div>
-                                <span className="rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary">Completada</span>
+                                <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Completada</span>
                             </div>
                             <div className="mt-6">
                                 <div className="mb-2 flex items-end justify-between">
-                                    <span className="text-sm font-semibold text-primary">{formatUsdc(fundedAmount)} USDC</span>
-                                    <span className="text-xs text-muted-foreground">100%</span>
+                                    <span className="text-sm font-semibold text-emerald-500 dark:text-emerald-400">Objetivo alcanzado</span>
                                 </div>
-                                <Progress value={100} className="h-3 bg-muted" />
                             </div>
                             {onProposeFundRound && (
                                 <>
